@@ -100,7 +100,7 @@ impl <T: USBKeyOut> Input<'_, T>{
 
     fn handle_keys(
         &mut self,
-    ) {
+    ) -> Result<(), String>{
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
@@ -109,8 +109,9 @@ impl <T: USBKeyOut> Input<'_, T>{
                     }
         self.events.drain_filter(|(_e, status)| EventStatus::Handled == *status);
         if self.events.iter().any(|(_e, status)| EventStatus::Unhandled == *status){
-            panic!("Unhandled input! {:?}", self.events);
+            return Err(format!("Unhandled input! {:?}", self.events));
         }
+        Ok(())
     }
 
 
@@ -613,13 +614,13 @@ mod tests {
         let mut h = [Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>];
         let mut input = Input::new(&mut h, KeyOutCatcher::new());
         input.add_keypress(KeyCode::A.into(), 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[KeyCode::A]]);
         assert!(!input.events.is_empty());
         input.add_keyrelease(KeyCode::A.into(), 20);
         assert!(input.events.len() == 2);
         input.output.clear();
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[]]);
         dbg!(&input.events);
         assert!(input.events.is_empty());
@@ -630,28 +631,28 @@ mod tests {
         let mut h = [Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>];
         let mut input = Input::new(&mut h, KeyOutCatcher::new());
         input.add_keypress(A.into(), 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         dbg!(&input.output.reports);
         check_output(&input, &[&[A]]);
         assert!(!input.events.is_empty());
 
         input.output.clear();
         input.add_keypress(KeyCode::X.into(), 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[A, X]]);
         assert!(!input.events.is_empty());
 
         input.output.clear();
         input.add_keyrelease(KeyCode::A.into(), 20);
         assert!(input.events.len() == 3);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[X]]);
         assert!(!input.events.is_empty());
 
         input.output.clear();
         input.add_keyrelease(KeyCode::X.into(), 20);
         assert!(input.events.len() == 2);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[]]);
         assert!(input.events.is_empty());
     }
@@ -667,12 +668,12 @@ mod tests {
         input.output.set_unicode_mode(UnicodeSendMode::Linux);
         //no output on press
         input.add_keypress(0x00E4 + UNICODE_BELOW_256, 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         assert!(input.output.reports.len() == 0);
         assert!(input.events.is_empty()); // we eat the keypress though
 
         input.add_keyrelease(0x00E4 + UNICODE_BELOW_256, 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(
             &input,
             &[
@@ -695,12 +696,12 @@ mod tests {
         input.output.set_unicode_mode(UnicodeSendMode::WinCompose);
         //no output on press
         input.add_keypress(0x03B4, 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         assert!(input.output.reports.len() == 0);
         assert!(input.events.is_empty()); // we eat the keypress though
 
         input.add_keyrelease(0x03B4, 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[]]);
         assert!(input.events.is_empty()); // we eat the keypress though
     }
@@ -713,25 +714,31 @@ mod tests {
         let mut input = Input::new(&mut h, KeyOutCatcher::new());
         input.output.set_unicode_mode(UnicodeSendMode::WinCompose);
         input.add_keypress(A.into(), 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[A]]);
         input.output.clear();
         input.add_keypress(0x3B4, 0);
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[A]]);
         input.add_keyrelease(0x3B4, 0);
         input.output.clear();
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[
            &[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[],
             &[A]]);
         input.add_keyrelease(A.into(), 0);
         input.output.clear();
-        input.handle_keys();
+        input.handle_keys().unwrap();
         check_output(&input, &[&[]]);
         assert!(input.events.is_empty());
-  
+    }
 
-
+ #[test]
+    fn test_panic_on_unhandled() {
+        let mut h = [ Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>,
+];
+        let mut input = Input::new(&mut h, KeyOutCatcher::new());
+        input.add_keypress(0xF0000, 0);
+        assert!(input.handle_keys().is_err());
     }
 }
