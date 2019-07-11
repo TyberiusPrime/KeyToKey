@@ -10,10 +10,6 @@ extern crate no_std_compat;
 use crate::key_codes::KeyCode;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
-//use heapless::consts; // type level integer used to specify capacity
-//use heapless::Vec; // fixed capacity `std::Vec`
-//use alloc::{vec::Vec, boxed::Box};
-//use core::convert::TryInto;
 
 /*struct TimeOut {
     ms_since_last: u16,
@@ -58,9 +54,15 @@ impl KeyRelease {
 
 #[derive(PartialEq, Debug)]
 enum Event {
-    Deleted,
     KeyPress(KeyPress),
     KeyRelease(KeyRelease),
+}
+
+#[derive(PartialEq, Debug)]
+enum EventStatus{
+    Unhandled,
+    Handled,
+    Ignored,
 }
 
 impl Event {
@@ -72,8 +74,15 @@ impl Event {
     }
 }
 
+
+fn iter_unhandled_mut(events: &mut Vec<(Event, EventStatus)>) -> impl DoubleEndedIterator<Item=&mut (Event, EventStatus)>
+{
+    events.iter_mut().filter(|(_e, status)| EventStatus::Unhandled == *status)
+}
+
+
 struct  Input <'a, T: USBKeyOut> {
-    events: Vec<Event>,
+    events: Vec<(Event, EventStatus)>,
     running_number: u8,
     handlers: &'a mut [Box<dyn ProcessKeys<T>>],
     output: T,
@@ -92,26 +101,14 @@ impl <T: USBKeyOut> Input<'_, T>{
     fn handle_keys(
         &mut self,
     ) {
-        let mut handled = false;
+        for (_e, status) in self.events.iter_mut() {
+            *status = EventStatus::Unhandled;
+        }
         for h in self.handlers.iter_mut() {
-            let r = h.process_keys(&mut self.events, &mut self.output);
-            match r {
-                ProcessingResult::NotMine => {}
-                ProcessingResult::NeedMoreInput => {
-                    handled = true;
-                    break;
-                }
-                ProcessingResult::Processed => {
-                    handled = true;
-                    break;
-                }
-            }
-        }
-        if !handled {
-            self.output.send_empty();
-        }
-        self.events.drain_filter(|x| Event::Deleted == *x);
-        if !handled && !self.events.is_empty() {
+            h.process_keys(&mut self.events, &mut self.output);
+                    }
+        self.events.drain_filter(|(_e, status)| EventStatus::Handled == *status);
+        if self.events.iter().any(|(_e, status)| EventStatus::Unhandled == *status){
             panic!("Unhandled input! {:?}", self.events);
         }
     }
@@ -125,7 +122,7 @@ impl <T: USBKeyOut> Input<'_, T>{
             running_number: self.running_number,
         };
         self.running_number += 1;
-        self.events.push(Event::KeyPress(e));
+        self.events.push((Event::KeyPress(e), EventStatus::Unhandled));
     }
     fn add_keyrelease(&mut self, keycode: u32, ms_since_last: u16) {
         let e = KeyRelease {
@@ -134,15 +131,8 @@ impl <T: USBKeyOut> Input<'_, T>{
             running_number: self.running_number,
         };
         self.running_number += 1;
-        self.events.push(Event::KeyRelease(e));
+        self.events.push((Event::KeyRelease(e), EventStatus::Unhandled));
     }
-}
-
-#[derive(Debug)]
-enum ProcessingResult {
-    NotMine,
-    NeedMoreInput,
-    Processed,
 }
 
 #[derive(Clone, Copy)]
@@ -152,7 +142,7 @@ enum UnicodeSendMode {
 }
 
 trait ProcessKeys<T: USBKeyOut> {
-    fn process_keys(&mut self, events: &mut Vec<Event>,  output: &mut T) -> ProcessingResult;
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>,  output: &mut T) -> ();
 }
 
 fn hex_digit_to_keycode(digit: char) -> KeyCode {
@@ -254,45 +244,40 @@ impl USBKeyboard {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<Event>,  output: &mut T) -> ProcessingResult {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>,  output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
         let mut codes_to_delete: Vec<u32> = Vec::new();
-        let mut result = ProcessingResult::NotMine;
-        for k in events.iter_mut().rev() {
+        for (e, status) in iter_unhandled_mut(events).rev() {
             //note that we're doing this in reverse, ie. releases happen before presses.
-            //dbg!(&k);
-            match k {
+            match e {
                 Event::KeyRelease(kc) => {
                     if kc.keycode < 256 {
                         if !codes_to_delete.contains(&kc.keycode) {
                             codes_to_delete.push(kc.keycode);
                         }
-                        *k = Event::Deleted;
-                        result = ProcessingResult::Processed;
+                        *status = EventStatus::Handled;
                     }
                 }
                 Event::KeyPress(kc) => {
                     if codes_to_delete.contains(&kc.keycode) {
-                        *k = Event::Deleted;
+                        *status = EventStatus::Handled;
                     } else {
                         if kc.keycode < 256 {
                             let oc: Result<KeyCode, String> = (kc.keycode as u8).try_into();
                             match oc {
-                                Ok(x) => output.register_key(x),
-                                Err(_) => *k = Event::Deleted,
+                                Ok(x) => {
+                                    output.register_key(x);
+                                    *status = EventStatus::Ignored; //so we may resend it...
+                                },
+                                Err(_) => *status = EventStatus::Handled, //throw it away, will ya?
                             };
-                            result = ProcessingResult::Processed;
                         }
                     }
                 }
-                _ => {}
             }
         }
         //dbg!(&result);
-        if let ProcessingResult::Processed = result {
-            output.send_registered();
-        }
-        result
+        output.send_registered();
     }
 }
 
@@ -323,14 +308,12 @@ impl UnicodeKeyboard {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<Event>,  output: &mut T) -> ProcessingResult{
-        let mut result = ProcessingResult::NotMine;
-        for k in events.iter_mut() {
-            match k {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>,  output: &mut T) -> (){
+        for (event, status) in iter_unhandled_mut(events) {
+            match event {
                 Event::KeyPress(kc) => {
                     if UnicodeKeyboard::is_unicode_keycode(kc.keycode) {
-                        *k = Event::Deleted;
-                        result = ProcessingResult::Processed;
+                        *status = EventStatus::Handled;
                     }
                 }
                 Event::KeyRelease(kc) => {
@@ -341,14 +324,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
                         if let Some(c) = c {
                             output.send_unicode(c);
                         }
-                        *k = Event::Deleted;
-                        result = ProcessingResult::Processed;
+                        *status = EventStatus::Handled;
                     }
                 }
-                _ => {}
             }
         }
-        return result;
     }
 }
 
@@ -641,6 +621,7 @@ mod tests {
         input.output.clear();
         input.handle_keys();
         check_output(&input, &[&[]]);
+        dbg!(&input.events);
         assert!(input.events.is_empty());
     }
     #[test]
@@ -650,6 +631,7 @@ mod tests {
         let mut input = Input::new(&mut h, KeyOutCatcher::new());
         input.add_keypress(A.into(), 0);
         input.handle_keys();
+        dbg!(&input.output.reports);
         check_output(&input, &[&[A]]);
         assert!(!input.events.is_empty());
 
@@ -733,16 +715,22 @@ mod tests {
         input.add_keypress(A.into(), 0);
         input.handle_keys();
         check_output(&input, &[&[A]]);
+        input.output.clear();
         input.add_keypress(0x3B4, 0);
         input.handle_keys();
         check_output(&input, &[&[A]]);
         input.add_keyrelease(0x3B4, 0);
         input.output.clear();
         input.handle_keys();
-        dbg!(&input.output.reports);
         check_output(&input, &[
            &[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[],
             &[A]]);
+        input.add_keyrelease(A.into(), 0);
+        input.output.clear();
+        input.handle_keys();
+        check_output(&input, &[&[]]);
+        assert!(input.events.is_empty());
+  
 
 
     }
