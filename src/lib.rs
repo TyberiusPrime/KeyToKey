@@ -465,42 +465,61 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_, T> {
         ProcessingResult::NotMine
     }
 }
+*/
 
-struct PressRelaseMacro<T: USBKeyOut> {
+struct PressReleaseMacro<'a, 
+    T, 
+    F1,
+    F2,
+   > {
     keycode: u32,
-    pub on_press: fn(&mut T) -> (),
-    pub on_release: fn(&mut T) -> (),
+    on_press: Option<F1>,
+    on_release: Option<F2>,
+    phantom: core::marker::PhantomData<&'a T>,
 }
-
-impl<T: USBKeyOut> ProcessKeys<T> for PressRelaseMacro<T> {
-    fn process_keys(&mut self, input: &mut Input, output: &mut T) -> ProcessingResult {
-        for k in input.events.iter_mut() {
-            match k {
-                Event::KeyRelease(kc) => {
-                    if kc.keycode == self.keycode {
-                        (self.on_press)(output);
-                        *k = Event::Deleted;
-                        return ProcessingResult::Processed;
-                    }
-                }
-                Event::KeyPress(kc) => {
-                    if kc.keycode == self.keycode {
-                        (self.on_release)(output);
-                        *k = Event::Deleted;
-                        return ProcessingResult::Processed;
-                    }
-                }
-                _ => {}
-            }
+impl<'a, T: USBKeyOut, 
+F1: FnMut(&mut T),
+F2: FnMut(&mut T),
+> PressReleaseMacro<'a, T, F1, F2> {
+    fn new(trigger: u32, on_press: Option<F1>, on_release: Option<F2>) -> PressReleaseMacro<'a, T, F1, F2> {
+        PressReleaseMacro {
+            keycode: trigger,
+            on_press,
+            on_release,
+            phantom: core::marker::PhantomData,
         }
-        ProcessingResult::NotMine
     }
 }
 
+impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for PressReleaseMacro<'_, T, F1, F2> {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        for (event, status) in events.iter_mut() {
+            match event {
+                Event::KeyPress(kc) => {
+                    if kc.keycode == self.keycode {
+                        *status = EventStatus::Handled;
+                        match &mut self.on_press {
+                            Some(x) =>  {(*x)(output)},
+                            None => {}
+                        }
+               }},
+                Event::KeyRelease(kc) =>{
+                    if kc.keycode == self.keycode {
+                        *status = EventStatus::Handled;
+                        match &mut self.on_release {
+                                Some(x) =>  {(*x)(output)},
+                                None => {}
+                            }
+               }}
+            }
+    }
+}
+}
+ 
 /// a macro that is called 'on' on the the first keypress
 /// and off on the second keyrelease.
 /// Using this you can implement e.g. sticky modifiers
-*/
+
 struct ToggleMacro<'a, 
     T, 
     F1: FnMut(&mut T),
@@ -588,7 +607,7 @@ mod tests {
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
     use crate::{
-        Event, Input, ProcessKeys, ToggleMacro, USBKeyOut, USBKeyboard, UnicodeKeyboard,
+        Event, Input, ProcessKeys, ToggleMacro, PressReleaseMacro, USBKeyOut, USBKeyboard, UnicodeKeyboard,
         UnicodeSendMode, UNICODE_BELOW_256,
     };
     use no_std_compat::prelude::v1::*;
@@ -860,8 +879,51 @@ mod tests {
         assert!(*down_counter.borrow() == 3);
         assert!(*up_counter.borrow() == 2);
         assert!(input.events.is_empty());
+    }
 
+    #[test]
+    fn test_press_release() {
+        use core::cell::RefCell;
+        let down_counter = RefCell::new(0);
+        let up_counter = RefCell::new(0);
+        let t = PressReleaseMacro::new(
+                0xF0000u32,
+                Option::Some(|output: &mut KeyOutCatcher| { //todo: why do we need to define the type here?
+                    output.send_keys(&[KeyCode::H]);
+                    let mut dc = down_counter.borrow_mut();
+                    *dc += 1;
+                }),
+                Option::Some(|output: &mut KeyOutCatcher| {
+                    let mut dc = up_counter.borrow_mut();
+                    *dc += 1;
+                    output.send_keys(&[KeyCode::I]);
+                })
+            );
+        let h = vec![
+            Box::new(t) as Box<dyn ProcessKeys<KeyOutCatcher>>,
+            Box::new(USBKeyboard::new())
+        ];
+
+        let mut input = Input::new(h, KeyOutCatcher::new());
+        //first press - sets
+        input.add_keypress(0xF0000u32, 0);
+        input.handle_keys().unwrap();
+        assert!(*down_counter.borrow() == 1);
+        assert!(*up_counter.borrow() == 0);
+        assert!(input.events.is_empty());
+        dbg!(&input.output.reports);
+        check_output(&input, &[&[KeyCode::H], &[]]);
+        input.output.clear();
+
+        //first release - no change
+        input.add_keyrelease(0xF0000u32, 0);
+        input.handle_keys().unwrap();
+        assert!(*down_counter.borrow() == 1);
+        assert!(*up_counter.borrow() == 1);
+        check_output(&input, &[&[KeyCode::I], &[]]);
+        input.output.clear();
 
  
     }
+ 
 }
