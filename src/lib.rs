@@ -8,9 +8,9 @@ extern crate alloc;
 extern crate no_std_compat;
 
 use crate::key_codes::KeyCode;
+use core::cell::RefCell;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
-use core::cell::RefCell;
 
 #[derive(PartialEq, Debug)]
 struct TimeOut {
@@ -130,11 +130,13 @@ impl<'a, T: USBKeyOut> Input<'_, T> {
         for h in self.handlers.iter_mut() {
             h.process_keys(&mut self.events, &mut self.output);
         }
-        self.events
-            .drain_filter(|(event, status)| (EventStatus::Handled == *status) || (
-                match event {
+        self.events.drain_filter(|(event, status)| {
+            (EventStatus::Handled == *status)
+                || (match event {
                     Event::TimeOut(_) => true,
-                    _=> false}));
+                    _ => false,
+                })
+        });
         if self
             .events
             .iter()
@@ -167,13 +169,14 @@ impl<'a, T: USBKeyOut> Input<'_, T> {
     }
 
     fn add_timeout(&mut self, ms_since_last: u16) {
-        let e = TimeOut{ ms_since_last };
-            if let Some((event, _status)) = self.events.iter().last() {
-                if let Event::TimeOut(_) = event {
-                    self.events.pop();
-                }
+        let e = TimeOut { ms_since_last };
+        if let Some((event, _status)) = self.events.iter().last() {
+            if let Event::TimeOut(_) = event {
+                self.events.pop();
             }
-        self.events.push((Event::TimeOut(e), EventStatus::Unhandled));
+        }
+        self.events
+            .push((Event::TimeOut(e), EventStatus::Unhandled));
     }
 }
 
@@ -317,7 +320,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                             };
                         }
                     }
-                },
+                }
                 Event::TimeOut(_) => {}
             }
         }
@@ -372,7 +375,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
                         *status = EventStatus::Handled;
                     }
                 }
-                ,Event::TimeOut(_) => {}
+                Event::TimeOut(_) => {}
             }
         }
     }
@@ -428,26 +431,30 @@ impl<T: USBKeyOut> ProcessKeys<T> for LeaderKeyboard {
 enum LayerAction<'a> {
     RewriteTo(u32),
     SendString(&'a str),
-//    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
+    //    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
 }
 struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
-    enabled: RefCell<bool>
+    enabled: RefCell<bool>,
 }
 
-impl Layer<'_>{
-    fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>) -> Layer<'_>{
-        Layer{
-            rewrites: rewrites.into_iter().map(|(trigger, action)| (trigger.to_u32(), action)).collect(),
-            enabled: RefCell::new(true)
+impl Layer<'_> {
+    fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>) -> Layer<'_> {
+        Layer {
+            rewrites: rewrites
+                .into_iter()
+                .map(|(trigger, action)| (trigger.to_u32(), action))
+                .collect(),
+            enabled: RefCell::new(true),
         }
     }
 }
 
-
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
-        if !*self.enabled.borrow() { return};
+        if !*self.enabled.borrow() {
+            return;
+        };
         for (event, status) in events.iter_mut() {
             match event {
                 Event::KeyRelease(kc) => {
@@ -461,7 +468,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     output.send_string(s);
                                     *status = EventStatus::Handled;
                                 }
-                                                            }
+                            }
                         }
                     }
                 }
@@ -472,12 +479,12 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                 LayerAction::RewriteTo(to_keycode) => {
                                     kc.keycode = *to_keycode;
                                 }
-                                _ => {*status = EventStatus::Handled}
+                                _ => *status = EventStatus::Handled,
                             }
                         }
                     }
                 }
-                ,Event::TimeOut(_) => {}
+                Event::TimeOut(_) => {}
             }
         }
     }
@@ -487,31 +494,26 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
     fn disable(&self) {
         *self.enabled.borrow_mut() = false;
     }
-
-
 }
 
-/// The simples callback - 
+/// The simples callback -
 /// call on_press(output: impl USBKeyOut) on key press
 /// and on_release(output) on release))
-/// trigger may be any keycode, 
+/// trigger may be any keycode,
 /// but preferentialy from the region 0xF00FF..=0xFFFFD
-/// which is not used by either UnicodeKeyboard or UsbKeyboard 
-struct PressReleaseMacro<'a, 
-    T, 
-    F1,
-    F2,
-   > {
+/// which is not used by either UnicodeKeyboard or UsbKeyboard
+struct PressReleaseMacro<'a, T, F1, F2> {
     keycode: u32,
     on_press: Option<F1>,
     on_release: Option<F2>,
     phantom: core::marker::PhantomData<&'a T>,
 }
-impl<'a, T: USBKeyOut, 
-F1: FnMut(&mut T),
-F2: FnMut(&mut T),
-> PressReleaseMacro<'a, T, F1, F2> {
-    fn new(trigger: impl AcceptsKeycode, on_press: Option<F1>, on_release: Option<F2>) -> PressReleaseMacro<'a, T, F1, F2> {
+impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> PressReleaseMacro<'a, T, F1, F2> {
+    fn new(
+        trigger: impl AcceptsKeycode,
+        on_press: Option<F1>,
+        on_release: Option<F2>,
+    ) -> PressReleaseMacro<'a, T, F1, F2> {
         PressReleaseMacro {
             keycode: trigger.to_u32(),
             on_press,
@@ -521,7 +523,9 @@ F2: FnMut(&mut T),
     }
 }
 
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for PressReleaseMacro<'_, T, F1, F2> {
+impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
+    for PressReleaseMacro<'_, T, F1, F2>
+{
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             match event {
@@ -529,44 +533,104 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for Pres
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
                         match &mut self.on_press {
-                            Some(x) =>  {(*x)(output)},
+                            Some(x) => (*x)(output),
                             None => {}
                         }
-               }},
-                Event::KeyRelease(kc) =>{
+                    }
+                }
+                Event::KeyRelease(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
                         match &mut self.on_release {
-                                Some(x) =>  {(*x)(output)},
-                                None => {}
-                            }
-               }}
-                ,Event::TimeOut(_) => {}
+                            Some(x) => (*x)(output),
+                            None => {}
+                        }
+                    }
+                }
+                Event::TimeOut(_) => {}
             }
+        }
     }
 }
-}
- 
+
 /// a macro that is called 'on' on the the first keypress
 /// and off on the second keyrelease.
 /// Using this you can implement e.g. sticky modifiers
+///
+struct StickyMacro<'a, T, F1: FnMut(&mut T), F2: FnMut(&mut T)> {
+    keycode: u32,
+    on_toggle_on: F1,
+    on_toggle_off: F2,
+    active: u8,
+    phantom: core::marker::PhantomData<&'a T>,
+}
+impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> StickyMacro<'a, T, F1, F2> {
+    fn new(
+        trigger: impl AcceptsKeycode,
+        on_toggle_on: F1,
+        on_toggle_off: F2,
+    ) -> StickyMacro<'a, T, F1, F2> {
+        StickyMacro {
+            keycode: trigger.to_u32(),
+            on_toggle_on,
+            on_toggle_off,
+            active: 0,
+            phantom: core::marker::PhantomData,
+        }
+    }
+}
 
-struct OneShot<'a, 
-    T, 
-    F1: FnMut(&mut T),
-    F2: FnMut(&mut T),
-    > {
+impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
+    for StickyMacro<'_, T, F1, F2>
+{
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        for (event, status) in events.iter_mut() {
+            //a sticky key
+            // on press if not active -> active
+            // on 2nd release if active -> deactivate
+            match event {
+                Event::KeyPress(kc) => {
+                    if kc.keycode == self.keycode {
+                        if self.active == 0 {
+                            self.active = 1;
+                            (self.on_toggle_on)(output);
+                        } else {
+                            self.active = 2;
+                        }
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::KeyRelease(kc) => {
+                    if kc.keycode == self.keycode {
+                        if self.active == 2 {
+                            (self.on_toggle_off)(output);
+                        }
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::TimeOut(_) => {}
+            }
+        }
+    }
+}
+
+/// A OneShot key
+/// press it, on_toggle_on will be called,
+/// on_toggle_off will be called after the next key
+/// release of if the OneShot trigger is pressed again
+struct OneShot<'a, T, F1: FnMut(&mut T), F2: FnMut(&mut T)> {
     keycode: u32,
     on_toggle_on: F1,
     on_toggle_off: F2,
     active: bool,
     phantom: core::marker::PhantomData<&'a T>,
 }
-impl<'a, T: USBKeyOut, 
-F1: FnMut(&mut T),
-F2: FnMut(&mut T),
-> OneShot<'a, T, F1, F2> {
-    fn new(trigger: impl AcceptsKeycode, on_toggle_on: F1, on_toggle_off: F2) -> OneShot<'a, T, F1, F2> {
+impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> OneShot<'a, T, F1, F2> {
+    fn new(
+        trigger: impl AcceptsKeycode,
+        on_toggle_on: F1,
+        on_toggle_off: F2,
+    ) -> OneShot<'a, T, F1, F2> {
         OneShot {
             keycode: trigger.to_u32(),
             on_toggle_on,
@@ -592,29 +656,27 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for OneS
                         if self.active {
                             self.active = false;
                             (self.on_toggle_off)(output);
-                        }
-                        else{
+                        } else {
                             self.active = true;
                             (self.on_toggle_on)(output);
                         }
-                }},
+                    }
+                }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
-                    }
-                    else {
+                    } else {
                         self.active = false;
-                            (self.on_toggle_off)(output);
+                        (self.on_toggle_off)(output);
                     }
-                   }
-                ,Event::TimeOut(_) => {}
                 }
+                Event::TimeOut(_) => {}
             }
+        }
     }
 }
 
-
-struct TapDance<'a, T, F>{
+struct TapDance<'a, T, F> {
     trigger: u32,
     tap_count: u8,
     on_tap_complete: F, //todo: should we differentiate between timeout and other key by passing an enum?
@@ -623,54 +685,48 @@ struct TapDance<'a, T, F>{
     phantom: core::marker::PhantomData<&'a T>,
 }
 
-impl <'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F>{
-
-    fn new(
-        trigger: impl AcceptsKeycode, 
-        on_tap_complete: F,
-    ) -> TapDance<'a, T, F> {
-        TapDance{
+impl<'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F> {
+    fn new(trigger: impl AcceptsKeycode, on_tap_complete: F) -> TapDance<'a, T, F> {
+        TapDance {
             trigger: trigger.to_u32(),
             tap_count: 0,
             on_tap_complete,
             timeout_ms: 250,
             phantom: core::marker::PhantomData,
         }
-
     }
-
 }
 
 impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
-        match event {
-            Event::KeyRelease(kc) => {
-                if kc.keycode == self.trigger{
-                    *status = EventStatus::Handled;
+            match event {
+                Event::KeyRelease(kc) => {
+                    if kc.keycode == self.trigger {
+                        *status = EventStatus::Handled;
+                    }
                 }
-
-            },
-            Event::KeyPress(kc) => {
-                if kc.keycode != self.trigger{
-                    if self.tap_count > 0 {
+                Event::KeyPress(kc) => {
+                    if kc.keycode != self.trigger {
+                        if self.tap_count > 0 {
+                            (self.on_tap_complete)(self.tap_count, output);
+                            self.tap_count = 0;
+                        }
+                    } else {
+                        self.tap_count += 1;
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::TimeOut(t) => {
+                    if self.tap_count > 0 && t.ms_since_last > self.timeout_ms {
                         (self.on_tap_complete)(self.tap_count, output);
                         self.tap_count = 0;
                     }
                 }
-                else {
-                    self.tap_count += 1;
-                    *status = EventStatus::Handled;
-                }
-            },
-            Event::TimeOut(t) =>{
-                if self.tap_count > 0 && t.ms_since_last > self.timeout_ms {
-                    (self.on_tap_complete)(self.tap_count, output);
-                    self.tap_count = 0;
-                }
+            }
         }
-        }
-}}}
+    }
+}
 
 //todo:
 // one shot: engage on first keypress.
@@ -698,8 +754,8 @@ mod tests {
 
     #[allow(unused_imports)]
     use crate::{
-        Event, Input, ProcessKeys, OneShot, PressReleaseMacro, Layer, LayerAction, USBKeyOut, USBKeyboard, UnicodeKeyboard,
-        UnicodeSendMode, UNICODE_BELOW_256,  TapDance,
+        Event, Input, Layer, LayerAction, OneShot, PressReleaseMacro, ProcessKeys, StickyMacro,
+        TapDance, USBKeyOut, USBKeyboard, UnicodeKeyboard, UnicodeSendMode, UNICODE_BELOW_256,
     };
     use no_std_compat::prelude::v1::*;
 
@@ -895,20 +951,20 @@ mod tests {
         let down_counter = RefCell::new(0);
         let up_counter = RefCell::new(0);
         let t = OneShot::new(
-                0xF0000u32,
-                |output: &mut KeyOutCatcher| {
-                    output.send_keys(&[KeyCode::H]);
-                    let mut dc = down_counter.borrow_mut();
-                    *dc += 1;
-                },
-                |_output| {
-                    let mut dc = up_counter.borrow_mut();
-                    *dc += 1;
-                }
-            );
+            0xF0000u32,
+            |output: &mut KeyOutCatcher| {
+                output.send_keys(&[KeyCode::H]);
+                let mut dc = down_counter.borrow_mut();
+                *dc += 1;
+            },
+            |_output| {
+                let mut dc = up_counter.borrow_mut();
+                *dc += 1;
+            },
+        );
         let h = vec![
             Box::new(t) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new())
+            Box::new(USBKeyboard::new()),
         ];
 
         let mut input = Input::new(h, KeyOutCatcher::new());
@@ -953,12 +1009,12 @@ mod tests {
         input.handle_keys().unwrap();
         assert!(*down_counter.borrow() == 2);
         assert!(*up_counter.borrow() == 1);
- 
+
         input.add_keyrelease(KeyCode::A, 20);
         input.handle_keys().unwrap();
         assert!(*down_counter.borrow() == 2);
         assert!(*up_counter.borrow() == 2);
- 
+
         //third release - no change
         input.add_keyrelease(0xF0000u32, 0);
         input.handle_keys().unwrap();
@@ -979,21 +1035,22 @@ mod tests {
         let down_counter = RefCell::new(0);
         let up_counter = RefCell::new(0);
         let t = PressReleaseMacro::new(
-                0xF0000u32,
-                Option::Some(|output: &mut KeyOutCatcher| { //todo: why do we need to define the type here?
-                    output.send_keys(&[KeyCode::H]);
-                    let mut dc = down_counter.borrow_mut();
-                    *dc += 1;
-                }),
-                Option::Some(|output: &mut KeyOutCatcher| {
-                    let mut dc = up_counter.borrow_mut();
-                    *dc += 1;
-                    output.send_keys(&[KeyCode::I]);
-                })
-            );
+            0xF0000u32,
+            Option::Some(|output: &mut KeyOutCatcher| {
+                //todo: why do we need to define the type here?
+                output.send_keys(&[KeyCode::H]);
+                let mut dc = down_counter.borrow_mut();
+                *dc += 1;
+            }),
+            Option::Some(|output: &mut KeyOutCatcher| {
+                let mut dc = up_counter.borrow_mut();
+                *dc += 1;
+                output.send_keys(&[KeyCode::I]);
+            }),
+        );
         let h = vec![
             Box::new(t) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new())
+            Box::new(USBKeyboard::new()),
         ];
 
         let mut input = Input::new(h, KeyOutCatcher::new());
@@ -1013,19 +1070,17 @@ mod tests {
         assert!(*up_counter.borrow() == 1);
         check_output(&input, &[&[KeyCode::I], &[]]);
         input.output.clear();
-
- 
     }
 
     #[test]
-    fn test_layer_rewrite()
-    {
-        let l = Layer::new(
-        vec![(KeyCode::A, LayerAction::RewriteTo(KeyCode::X.into()))]
-        );
+    fn test_layer_rewrite() {
+        let l = Layer::new(vec![(
+            KeyCode::A,
+            LayerAction::RewriteTo(KeyCode::X.into()),
+        )]);
         let h = vec![
             Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new())
+            Box::new(USBKeyboard::new()),
         ];
 
         let mut input = Input::new(h, KeyOutCatcher::new());
@@ -1043,14 +1098,10 @@ mod tests {
         input.add_keyrelease(KeyCode::X, 0);
         input.handle_keys().unwrap();
 
-        check_output(&input, &[
-            &[KeyCode::B],
-            &[],
-            &[KeyCode::X],
-            &[],
-            &[KeyCode::X],
-            &[],
-        ]);
+        check_output(
+            &input,
+            &[&[KeyCode::B], &[], &[KeyCode::X], &[], &[KeyCode::X], &[]],
+        );
 
         input.output.clear();
         input.add_keypress(KeyCode::A, 0);
@@ -1061,12 +1112,10 @@ mod tests {
         input.handle_keys().unwrap();
         input.add_keyrelease(KeyCode::A, 0);
         input.handle_keys().unwrap();
-        check_output(&input, &[
-            &[KeyCode::X],
-            &[KeyCode::X, KeyCode::B],
-            &[KeyCode::X],
-            &[]
-        ]);
+        check_output(
+            &input,
+            &[&[KeyCode::X], &[KeyCode::X, KeyCode::B], &[KeyCode::X], &[]],
+        );
 
         input.output.clear();
         input.handlers[0].disable();
@@ -1074,9 +1123,7 @@ mod tests {
         input.handle_keys().unwrap();
         input.add_keyrelease(KeyCode::A, 0);
         input.handle_keys().unwrap();
-        check_output(&input, &[
-            &[KeyCode::A],
-            &[]]);
+        check_output(&input, &[&[KeyCode::A], &[]]);
 
         input.output.clear();
         input.handlers[0].enable();
@@ -1084,9 +1131,7 @@ mod tests {
         input.handle_keys().unwrap();
         input.add_keyrelease(KeyCode::A, 0);
         input.handle_keys().unwrap();
-        check_output(&input, &[
-            &[KeyCode::X],
-            &[]]);
+        check_output(&input, &[&[KeyCode::X], &[]]);
 
         //TODO: what happens when you disable the layer in the middle?
         // I suspect that we will keep repeating one of the keycodes.
@@ -1094,22 +1139,21 @@ mod tests {
         // possibly by clearing the input events whenever a layer toggle happens?
     }
 
-
     #[test]
-    fn test_tapdance()
-    {
-        let l = TapDance::new(KeyCode::X, |tap_count, output:&mut KeyOutCatcher| {
-            match tap_count {
+    fn test_tapdance() {
+        let l = TapDance::new(
+            KeyCode::X,
+            |tap_count, output: &mut KeyOutCatcher| match tap_count {
                 1 => output.send_keys(&[KeyCode::A]),
                 2 => output.send_keys(&[KeyCode::B]),
                 3 => output.send_keys(&[KeyCode::C]),
                 _ => output.send_keys(&[KeyCode::D]),
-            }
-        } );
+            },
+        );
         let timeout = l.timeout_ms;
         let h = vec![
             Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new())
+            Box::new(USBKeyboard::new()),
         ];
 
         let mut input = Input::new(h, KeyOutCatcher::new());
@@ -1127,11 +1171,8 @@ mod tests {
 
         input.add_keypress(KeyCode::Z, 20);
         input.handle_keys().unwrap();
- //       input.add_keyrelease(KeyCode::Z, 30);
-        check_output(&input, &[
-            &[ KeyCode::A],
-            &[ KeyCode::Z],
-        ]);
+        //       input.add_keyrelease(KeyCode::Z, 30);
+        check_output(&input, &[&[KeyCode::A], &[KeyCode::Z]]);
         input.add_keyrelease(KeyCode::Z, 20);
         input.handle_keys().unwrap();
         assert!(input.events.is_empty());
@@ -1160,15 +1201,11 @@ mod tests {
 
         input.add_keypress(KeyCode::Z, 40);
         input.handle_keys().unwrap();
-//        input.add_keyrelease(KeyCode::Z, 50);
-        check_output(&input, &[
-            &[ KeyCode::B],
-            &[ KeyCode::Z],
-        ]);
+        //        input.add_keyrelease(KeyCode::Z, 50);
+        check_output(&input, &[&[KeyCode::B], &[KeyCode::Z]]);
         input.add_keyrelease(KeyCode::Z, 20);
         input.handle_keys().unwrap();
         assert!(input.events.is_empty());
-
 
         //three taps, then a time out
         input.output.clear();
@@ -1202,19 +1239,52 @@ mod tests {
         check_output(&input, &[&[]]);
         input.output.clear();
 
-        input.add_timeout(timeout-1);
+        input.add_timeout(timeout - 1);
         input.handle_keys().unwrap();
         check_output(&input, &[&[]]);
         input.output.clear();
 
-        input.add_timeout(timeout+1);
+        input.add_timeout(timeout + 1);
         input.handle_keys().unwrap();
-        check_output(&input, &[
-            &[ KeyCode::C],
-            &[],
-        ]);
+        check_output(&input, &[&[KeyCode::C], &[]]);
+    }
 
-  
+    #[test]
+    fn test_sticky_macro() {
+        let l = StickyMacro::new(
+            KeyCode::X,
+            |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::A]),
+            |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::B]),
+        );
+        let h = vec![
+            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
+            Box::new(USBKeyboard::new()),
+        ];
+
+        let mut input = Input::new(h, KeyOutCatcher::new());
+
+        //activate
+        input.add_keypress(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[KeyCode::A], &[]]);
+        input.output.clear();
+
+        //ignore
+        input.add_keyrelease(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        //ignore
+        input.add_keypress(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        //deactivate
+        input.add_keyrelease(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[KeyCode::B], &[]]);
     }
 
 }

@@ -33,7 +33,7 @@ pub enum KeyCode {
     W,
     X,
     Y,
-    Z, //29
+    Z,   //29
     Kb1, // Keyboard 1
     Kb2,
     Kb3, // 0x20
