@@ -184,6 +184,7 @@ impl<'a, T: USBKeyOut> Input<'_, T> {
 enum UnicodeSendMode {
     Linux = 1,
     WinCompose,
+    Debug,
 }
 
 trait ProcessKeys<T: USBKeyOut> {
@@ -242,6 +243,12 @@ trait USBKeyOut {
                     self.send_keys(&[hex_digit_to_keycode(out_c)]);
                 }
                 self.send_empty();
+            },
+            UnicodeSendMode::Debug =>  {
+                let mut buf = [0,0,0,0];
+                c.encode_utf8(&mut buf);
+                self.send_keys(&[buf[0].try_into().unwrap()]);
+
             }
         }
     }
@@ -276,7 +283,7 @@ struct USBKeyboard {
     ctrl: bool,
     alt: bool,
     meta: bool,
-    unicode_sendmode: UnicodeSendMode,
+    //unicode_sendmode: UnicodeSendMode,
 }
 
 impl USBKeyboard {
@@ -286,7 +293,7 @@ impl USBKeyboard {
             ctrl: false,
             alt: false,
             meta: false,
-            unicode_sendmode: UnicodeSendMode::Linux,
+            //unicode_sendmode: UnicodeSendMode::Linux,
         }
     }
 }
@@ -381,52 +388,98 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
     }
 }
 
-/*struct LeaderKeyboard <'a>{
-    leader: u32,
-    mappings: &'a[(&'a[u32], String)],
-    on_failure: fn () //todo
+#[derive(PartialEq)]
+enum MatchResult<'a> {
+    Match(&'a str),
+    WontMatch,
+    NeedsMoreInput,
 }
 
-impl<T: USBKeyOut> ProcessKeys<T> for LeaderKeyboard {
-    fn process_keys(&mut self, input: &mut Vec<Event>, output: &mut T) -> ProcessingResult {
-    let mut result = ProcessingResult::NotMine;
-    let mut inside_leader_sequence = false;
-    let mut Vec<Event> sequence = Vec::new();
-    for k in input.iter_mut(){
-        if !inside_leader_sequence{
-        match k {
-           Event::KeyRelease(kc) => if kc == self.leader {
-               result = ProcessingResult::NeedMoreInput;
-           }
-           Event::KeyPress(kc) => if kc == self.leader {
-               *k = Event::Deleted;
-           }
-           _ => {}
-        }
-        } else
-        {
-        match k {
-           Event::KeyRelease(kc) => if kc == self.leader {
-               result = ProcessingResult::NeedMoreInput;
-               sequence.push(kc);
-               let hit = self.match_sequence(sequence)
-               match hit {
-                   LeaderSequence::Hit(s) {output.send_string(s); return ProcessingResult.Processed},
-                   LeaderSequence::Miss() => {self.on_failure(); input.clear(); return ProcessingResult.Processed;}
-                   LeaderSequence::Wait() => {return ProcessingResult.NeedMoreInput}
-               }
-           }
-           Event::KeyPress(kc) => if kc == self.leader {
-               *k = Event::Deleted;
-           }
-           _ => {}
+struct Leader<'a> {
+    trigger: u32,
+    mappings: Vec<(Vec<u32>, &'a str)>,
+    failure: &'a str,
+    prefix: Vec<u32>, //todo: refactor to not need this
+    active: bool,
+}
 
+impl<'a> Leader<'a> {
+    fn new<T: AcceptsKeycode>(
+        trigger: impl AcceptsKeycode,
+        mappings: Vec<(Vec<T>, &'a str)>,
+        failure: &'a str,
+    ) -> Leader<'a> {
+        //Todo: Figure out how to check for mappings that are prefixes of other mappings
+        //(and therefore impossible) at compile time
+        Leader {
+            trigger: trigger.to_u32(),
+            mappings: mappings.into_iter().map(|(a, b)| (
+                a.into_iter().map(|x| x.to_u32()).collect(), b)
+                ).collect(),
+            failure,
+            prefix: Vec::new(),
+            active: false,
         }
     }
-    return result;
+    fn match_prefix(&self) -> MatchResult{
+        let mut result = MatchResult::WontMatch;
+        for (seq, out) in self.mappings.iter() {
+            if seq.len() < self.prefix.len() {
+                continue;
+            }
+            if self.prefix.iter().zip(seq.iter()).all(|(a, b)| a == b) {
+                if seq.len() == self.prefix.len() {
+                    return MatchResult::Match(out);
+                } else {
+                    result = MatchResult::NeedsMoreInput;
+                }
+            }
+        }
+        result
+    }
 }
+
+impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        for (event, status) in iter_unhandled_mut(events) {
+            match event {
+                Event::KeyRelease(kc) => {
+                    if self.active {
+                        self.prefix.push(kc.keycode);
+                        match self.match_prefix() {
+                            MatchResult::Match(s) => {
+                                output.send_string(s);
+                                self.active = false;
+                                self.prefix.clear()
+                            }
+                            MatchResult::WontMatch => {
+                                output.send_string(self.failure);
+                                self.active = false;
+                                self.prefix.clear()
+                            }
+                            MatchResult::NeedsMoreInput => {}
+                        }
+                        *status = EventStatus::Handled;
+                    } else if kc.keycode == self.trigger {
+                        if !self.active {
+                            self.active = true;
+                        }
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::KeyPress(kc) => {
+                    if kc.keycode == self.trigger {
+                        *status = EventStatus::Handled;
+                    }
+                    else if self.active { // while active, we eat all KeyPresses and only parse KeyRelease
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::TimeOut(_) => {}
+            }
+        }
+    }
 }
-*/
 
 enum LayerAction<'a> {
     RewriteTo(u32),
@@ -729,11 +782,6 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
 }
 
 //todo:
-// one shot: engage on first keypress.
-//   disengage after any subsequent keyrelease.
-//   except if they key is still being pressed
-//   if that happend, disengage once the
-//   trigger get's released
 
 // space cadet keys: one thing on tap, modifier/macro on press
 // finish leader key
@@ -754,7 +802,7 @@ mod tests {
 
     #[allow(unused_imports)]
     use crate::{
-        Event, Input, Layer, LayerAction, OneShot, PressReleaseMacro, ProcessKeys, StickyMacro,
+        Event, Input, Layer, LayerAction, OneShot, PressReleaseMacro, ProcessKeys, StickyMacro, Leader, MatchResult,
         TapDance, USBKeyOut, USBKeyboard, UnicodeKeyboard, UnicodeSendMode, UNICODE_BELOW_256,
     };
     use no_std_compat::prelude::v1::*;
@@ -1285,6 +1333,107 @@ mod tests {
         input.add_keyrelease(KeyCode::X, 0);
         input.handle_keys().unwrap();
         check_output(&input, &[&[KeyCode::B], &[]]);
+    }
+
+    #[test]
+    fn test_leader() {
+        use crate::key_codes::KeyCode::*;
+        use core::convert::TryInto;
+
+        let mut l = Leader::new(
+            KeyCode::X,
+            vec![
+                (vec![A, B, C], "A"),
+                (vec![A, B, D], "B"),
+                //Todo: check that none is a prefix of another!
+                //(vec![A], "C"),
+            ],
+            "E",
+        );
+        assert!(l.match_prefix() == MatchResult::NeedsMoreInput);
+        l.prefix.push(A.into());
+        assert!(l.match_prefix() == MatchResult::NeedsMoreInput);
+        l.prefix.push(B.into());
+        assert!(l.match_prefix() == MatchResult::NeedsMoreInput);
+        l.prefix.push(C.into());
+        assert!(match l.match_prefix() {
+            MatchResult::Match(m) => {assert!(m == "A"); true},
+            _ => false});
+        l.prefix.clear();
+        assert!(l.match_prefix() == MatchResult::NeedsMoreInput);
+        l.prefix.push(C.into());
+        assert!(l.match_prefix() == MatchResult::WontMatch);
+        l.prefix.clear();
+
+
+        let keyb = USBKeyboard::new();
+        let h = vec![
+            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
+            Box::new(keyb),
+        ];
+
+        let mut input = Input::new(h, KeyOutCatcher::new());
+        input.output.set_unicode_mode(UnicodeSendMode::Debug);
+
+        //activate
+        input.add_keypress(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        input.add_keyrelease(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        input.add_keypress(KeyCode::A, 0);
+        input.add_keyrelease(KeyCode::A, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        input.add_keypress(KeyCode::B, 0);
+        input.add_keyrelease(KeyCode::B, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        input.add_keypress(KeyCode::C, 0);
+        input.add_keyrelease(KeyCode::C, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[65u8.try_into().unwrap()], &[]]);
+        input.output.clear();
+
+        input.add_keypress(KeyCode::F, 0);
+        input.handle_keys().unwrap();
+        input.add_keyrelease(KeyCode::F, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[F], &[]]);
+        input.output.clear();
+
+        input.add_keypress(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        input.add_keyrelease(KeyCode::X, 0);
+        input.handle_keys().unwrap();
+        check_output(&input, &[&[]]);
+        input.output.clear();
+
+        //test error case
+        input.add_keypress(KeyCode::C, 0);
+        input.add_keyrelease(KeyCode::C, 0);
+        input.handle_keys().unwrap();
+        dbg!(&input.output.reports);
+        check_output(&input, &[&[69u8.try_into().unwrap()], &[]]);
+  
+
+
+
+
+
+
     }
 
 }

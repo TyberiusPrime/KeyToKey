@@ -8,7 +8,7 @@ pub enum KeyCode {
     ErrorRollOver,
     PostFail,
     ErrorUndefined,
-    A,
+    A, // 4
     B,
     C,
     D,
