@@ -436,9 +436,9 @@ struct Layer<'a> {
 }
 
 impl Layer<'_>{
-    fn new(rewrites: Vec<(u32, LayerAction)>) -> Layer<'_>{
+    fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>) -> Layer<'_>{
         Layer{
-            rewrites,
+            rewrites: rewrites.into_iter().map(|(trigger, action)| (trigger.to_u32(), action)).collect(),
             enabled: RefCell::new(true)
         }
     }
@@ -511,9 +511,9 @@ impl<'a, T: USBKeyOut,
 F1: FnMut(&mut T),
 F2: FnMut(&mut T),
 > PressReleaseMacro<'a, T, F1, F2> {
-    fn new(trigger: u32, on_press: Option<F1>, on_release: Option<F2>) -> PressReleaseMacro<'a, T, F1, F2> {
+    fn new(trigger: impl AcceptsKeycode, on_press: Option<F1>, on_release: Option<F2>) -> PressReleaseMacro<'a, T, F1, F2> {
         PressReleaseMacro {
-            keycode: trigger,
+            keycode: trigger.to_u32(),
             on_press,
             on_release,
             phantom: core::marker::PhantomData,
@@ -566,9 +566,9 @@ impl<'a, T: USBKeyOut,
 F1: FnMut(&mut T),
 F2: FnMut(&mut T),
 > ToggleMacro<'a, T, F1, F2> {
-    fn new(trigger: u32, on_toggle_on: F1, on_toggle_off: F2) -> ToggleMacro<'a, T, F1, F2> {
+    fn new(trigger: impl AcceptsKeycode, on_toggle_on: F1, on_toggle_off: F2) -> ToggleMacro<'a, T, F1, F2> {
         ToggleMacro {
-            keycode: trigger,
+            keycode: trigger.to_u32(),
             on_toggle_on,
             on_toggle_off,
             active: false,
@@ -1023,7 +1023,7 @@ mod tests {
     fn test_layer_rewrite()
     {
         let l = Layer::new(
-        vec![(KeyCode::A.into(), LayerAction::RewriteTo(KeyCode::X.into()))]
+        vec![(KeyCode::A, LayerAction::RewriteTo(KeyCode::X.into()))]
         );
         let h = vec![
             Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
