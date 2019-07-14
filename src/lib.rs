@@ -551,7 +551,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for Pres
 /// and off on the second keyrelease.
 /// Using this you can implement e.g. sticky modifiers
 
-struct ToggleMacro<'a, 
+struct OneShot<'a, 
     T, 
     F1: FnMut(&mut T),
     F2: FnMut(&mut T),
@@ -565,9 +565,9 @@ struct ToggleMacro<'a,
 impl<'a, T: USBKeyOut, 
 F1: FnMut(&mut T),
 F2: FnMut(&mut T),
-> ToggleMacro<'a, T, F1, F2> {
-    fn new(trigger: impl AcceptsKeycode, on_toggle_on: F1, on_toggle_off: F2) -> ToggleMacro<'a, T, F1, F2> {
-        ToggleMacro {
+> OneShot<'a, T, F1, F2> {
+    fn new(trigger: impl AcceptsKeycode, on_toggle_on: F1, on_toggle_off: F2) -> OneShot<'a, T, F1, F2> {
+        OneShot {
             keycode: trigger.to_u32(),
             on_toggle_on,
             on_toggle_off,
@@ -577,10 +577,9 @@ F2: FnMut(&mut T),
     }
 }
 
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for ToggleMacro<'_, T, F1, F2> {
+impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for OneShot<'_, T, F1, F2> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
-            //this is simply broken...
             //a sticky key
             // on press if not active -> active
             // on other key release -> deactivate
@@ -682,7 +681,6 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
 
 // space cadet keys: one thing on tap, modifier/macro on press
 // finish leader key
-// tap dance
 
 //lower priority
 // combos
@@ -700,7 +698,7 @@ mod tests {
 
     #[allow(unused_imports)]
     use crate::{
-        Event, Input, ProcessKeys, ToggleMacro, PressReleaseMacro, Layer, LayerAction, USBKeyOut, USBKeyboard, UnicodeKeyboard,
+        Event, Input, ProcessKeys, OneShot, PressReleaseMacro, Layer, LayerAction, USBKeyOut, USBKeyboard, UnicodeKeyboard,
         UnicodeSendMode, UNICODE_BELOW_256,  TapDance,
     };
     use no_std_compat::prelude::v1::*;
@@ -896,7 +894,7 @@ mod tests {
     fn test_toggle_macro() {
         let down_counter = RefCell::new(0);
         let up_counter = RefCell::new(0);
-        let t = ToggleMacro::new(
+        let t = OneShot::new(
                 0xF0000u32,
                 |output: &mut KeyOutCatcher| {
                     output.send_keys(&[KeyCode::H]);
