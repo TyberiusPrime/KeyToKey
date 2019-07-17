@@ -781,10 +781,46 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
     }
 }
 
+struct SpaceCadet<'a, T, F1, F2> {
+    trigger: u32,
+    on_activate: F1,
+    on_deactivate: F2,
+    phantom: core::marker::PhantomData<&'a T>,
+}
+
+impl<'a, T: USBKeyOut, 
+    F1: FnMut(&mut T)
+    F2: FnMut(&mut T)
+> SpaceCadet<'a, T, F1, F2> {
+    fn new(
+        trigger: impl AcceptsKeycode, 
+        on_activate: F1
+        on_deactivate: F2) -> TapDance<'a, T, F1, F2> {
+        SpaceCadet {
+            trigger: trigger.to_u32(),
+            on_activate,
+            on_deactivate,
+            phantom: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: USBKeyOut, F1: FnMut(u8, &mut T), F2: FnMut(u8, &mut T)> ProcessKeys<T> for SpaceCadet<'_, T, F1, F2> {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        for (event, status) in iter_unhandled_mut(events) {
+            match event {
+                Event::KeyRelease(kc) => {},
+                Event::KeyPress(kc) => {},
+                Event::TimeOut(t) => {},
+            }
+        }
+    }
+}
+
+
 //todo:
 
 // space cadet keys: one thing on tap, modifier/macro on press
-// finish leader key
 
 //lower priority
 // combos
