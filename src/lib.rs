@@ -1,16 +1,15 @@
-
 //todo:
 //debug Processor that ouputs whatever is being seen?
+
+//alternative to panic on unhandled?
 
 // combos - tricky, but straight forward
 // tapdance, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
 // premade toggle/oneshot modifiers
-// layer disabling
 // key lock (repeat next key until it is pressed again)
 // mouse keys? - probably out of scope of this libary
 // steganograpyh
-
 
 #![allow(dead_code)]
 #![feature(drain_filter)]
@@ -22,7 +21,6 @@ extern crate alloc;
 extern crate no_std_compat;
 
 use crate::key_codes::KeyCode;
-use core::cell::RefCell;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 
@@ -97,17 +95,16 @@ struct KeyboardState {
     alt: bool,
     meta: bool,
     unicode_mode: UnicodeSendMode,
- 
 }
 impl KeyboardState {
     fn new() -> KeyboardState {
         KeyboardState {
-                shift: false,
-                ctrl: false,
-                alt: false,
-                meta: false,
-                unicode_mode: UnicodeSendMode::Linux,
-            }    
+            shift: false,
+            ctrl: false,
+            alt: false,
+            meta: false,
+            unicode_mode: UnicodeSendMode::Linux,
+        }
     }
 }
 
@@ -115,25 +112,45 @@ struct Keyboard<'a, T: USBKeyOut> {
     events: Vec<(Event, EventStatus)>,
     running_number: u8,
     handlers: Vec<Box<dyn ProcessKeys<T> + 'a>>,
+    enabled: Vec<bool>,
     output: T,
 }
 
-impl<'a, T: USBKeyOut> Keyboard<'_, T> {
-    fn new(handlers: Vec<Box<dyn ProcessKeys<T> + 'a>>, output: T) -> Keyboard<T> {
+type HandlerID = usize;
+
+impl<'a, T: USBKeyOut> Keyboard<'a, T> {
+    fn new(output: T) -> Keyboard<'a, T> {
         Keyboard {
             events: Vec::new(),
             running_number: 0,
-            handlers,
+            handlers: Vec::new(),
+            enabled: Vec::new(), //possibly replace by fancy bit addresing variant?
             output,
         }
+    }
+
+    fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + 'a>) -> HandlerID {
+        self.handlers.push(handler);
+        self.enabled.push(true);
+        return self.handlers.len() - 1;
+    }
+
+    fn enable_handler(&mut self, no: HandlerID) {
+        self.enabled[no] = true;
+    }
+
+    fn disable_handler(&mut self, no: HandlerID) {
+        self.enabled[no] = false;
     }
 
     fn handle_keys(&mut self) -> Result<(), String> {
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
-        for h in self.handlers.iter_mut() {
-            h.process_keys(&mut self.events, &mut self.output);
+        for (h, e) in self.handlers.iter_mut().zip(self.enabled.iter()) {
+            if *e {
+                h.process_keys(&mut self.events, &mut self.output);
+            }
         }
         self.events.drain_filter(|(event, status)| {
             (EventStatus::Handled == *status)
@@ -168,7 +185,7 @@ impl<'a, T: USBKeyOut> Keyboard<'_, T> {
             keycode: keycode.to_u32(),
             ms_since_last,
             running_number: self.running_number,
-            flag: 0
+            flag: 0,
         };
         self.running_number += 1;
         self.events
@@ -186,17 +203,31 @@ impl<'a, T: USBKeyOut> Keyboard<'_, T> {
     }
 }
 
+/// Different operating systems expect random unicode input
+/// as different key combinations
+/// unfortunatly, we can't detect what we're connected to,
+/// so the keyboard needs to provide some kinde of switch key.
 #[derive(Clone, Copy)]
 enum UnicodeSendMode {
+    //default X
     Linux = 1,
+    /// use https://github.com/samhocevar/wincompose
     WinCompose,
+    // used by the tests
     Debug,
 }
 
+/// Handlers are defined by this trait
+///
+/// they process the events, set their status to either Handled or Ignored
+/// (if more data is necessary), and send input to the computer via output
 trait ProcessKeys<T: USBKeyOut> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> ();
-    fn enable(&self) {}
-    fn disable(&self) {}
+    /// whether this handler is enabled after add_handlers
+    /// (true for most, false for Layers)
+    fn default_enabled(&self) -> bool {
+        true
+    }
 }
 
 fn hex_digit_to_keycode(digit: char) -> KeyCode {
@@ -285,19 +316,16 @@ trait USBKeyOut {
 /// Just map your keys to the usb keycodes.
 ///
 /// key repeat is whatever usb does...
-struct USBKeyboard {
-    }
+struct USBKeyboard {}
 
 impl USBKeyboard {
     fn new() -> USBKeyboard {
-        USBKeyboard {
-        }
+        USBKeyboard {}
     }
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
         let mut codes_to_delete: Vec<u32> = Vec::new();
         for (e, status) in iter_unhandled_mut(events).rev() {
@@ -355,9 +383,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             output.register_key(KeyCode::LGui);
         }
 
-
-
-
         output.send_registered();
     }
 }
@@ -389,8 +414,7 @@ impl UnicodeKeyboard {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
@@ -468,8 +492,7 @@ impl<'a> Leader<'a> {
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyRelease(kc) => {
@@ -517,7 +540,6 @@ enum LayerAction<'a> {
 }
 struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
-    enabled: RefCell<bool>,
 }
 
 impl Layer<'_> {
@@ -527,17 +549,12 @@ impl Layer<'_> {
                 .into_iter()
                 .map(|(trigger, action)| (trigger.to_u32(), action))
                 .collect(),
-            enabled: RefCell::new(true),
         }
     }
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
-        if !*self.enabled.borrow() {
-            return;
-        };
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             match event {
                 Event::KeyRelease(kc) => {
@@ -571,11 +588,9 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
             }
         }
     }
-    fn enable(&self) {
-        *self.enabled.borrow_mut() = true;
-    }
-    fn disable(&self) {
-        *self.enabled.borrow_mut() = false;
+
+    fn default_enabled(&self) -> bool {
+        false
     }
 }
 
@@ -609,8 +624,7 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> PressReleaseMacro<'
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     for PressReleaseMacro<'_, T, F1, F2>
 {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             match event {
                 Event::KeyPress(kc) => {
@@ -667,8 +681,7 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> StickyMacro<'a, T, 
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     for StickyMacro<'_, T, F1, F2>
 {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             //a sticky key
             // on press if not active -> active
@@ -727,8 +740,7 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> OneShot<'a, T, F1, 
 }
 
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for OneShot<'_, T, F1, F2> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             //a sticky key
             // on press if not active -> active
@@ -784,8 +796,7 @@ impl<'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F> {
 }
 
 impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyRelease(kc) => {
@@ -846,8 +857,7 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> SpaceCadet<'a, T, F
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     for SpaceCadet<'_, T, F1, F2>
 {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         let mut initial_keypress_status: Option<EventStatus> = None;
         for (event, status) in iter_unhandled_mut(events) {
             match event {
@@ -934,8 +944,7 @@ impl AutoShift {
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T,
-    ) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         let mut presses = Vec::new();
         let mut handled = Vec::new();
         for (event, status) in iter_unhandled_mut(events) {
@@ -956,12 +965,8 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
                                         KeyCode::LShift,
                                         (kc.keycode as u8).try_into().unwrap(),
                                     ])
-                                }
-                                else {
-                                    output.send_keys(&[
-                                        (kc.keycode as u8).try_into().unwrap(),
-                                    ])
-
+                                } else {
+                                    output.send_keys(&[(kc.keycode as u8).try_into().unwrap()])
                                 }
                                 handled.push(kc.keycode)
                             }
@@ -994,9 +999,9 @@ mod tests {
 
     #[allow(unused_imports)]
     use crate::{
-        Event, Keyboard, KeyboardState, Layer, LayerAction, Leader, MatchResult, OneShot, PressReleaseMacro,
-        ProcessKeys, SpaceCadet, StickyMacro, TapDance, USBKeyOut, USBKeyboard, UnicodeKeyboard, AutoShift,
-        UnicodeSendMode, UNICODE_BELOW_256,
+        AutoShift, Event, Keyboard, KeyboardState, Layer, LayerAction, Leader, MatchResult,
+        OneShot, PressReleaseMacro, ProcessKeys, SpaceCadet, StickyMacro, TapDance, USBKeyOut,
+        USBKeyboard, UnicodeKeyboard, UnicodeSendMode, UNICODE_BELOW_256,
     };
     use no_std_compat::prelude::v1::*;
 
@@ -1058,8 +1063,8 @@ mod tests {
     }
     #[test]
     fn test_usbkeyboard_single_key() {
-        let h = vec![Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A]]);
@@ -1074,8 +1079,8 @@ mod tests {
     #[test]
     fn test_usbkeyboard_multiple_key() {
         use KeyCode::*;
-        let h = vec![Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.add_keypress(A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[A]]);
@@ -1106,8 +1111,8 @@ mod tests {
     fn test_unicode_keyboard_linux() {
         use KeyCode::*;
         let ub = UnicodeKeyboard {};
-        let h = vec![Box::new(ub) as Box<dyn ProcessKeys<KeyOutCatcher>>];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(ub));
         keyboard.output.get_state().unicode_mode = UnicodeSendMode::Linux;
         //no output on press
         keyboard.add_keypress(0x00E4u32 + UNICODE_BELOW_256, 0);
@@ -1134,8 +1139,8 @@ mod tests {
     fn test_unicode_keyboard_wincompose() {
         use KeyCode::*;
         let ub = UnicodeKeyboard {};
-        let h = vec![Box::new(ub) as Box<dyn ProcessKeys<KeyOutCatcher>>];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(ub));
         keyboard.output.get_state().unicode_mode = UnicodeSendMode::WinCompose;
         //no output on press
         keyboard.add_keypress(0x03B4u32, 0);
@@ -1152,11 +1157,9 @@ mod tests {
     #[test]
     fn test_unicode_while_depressed() {
         use KeyCode::*;
-        let h = vec![
-            Box::new(UnicodeKeyboard {}) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(UnicodeKeyboard {}));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.output.get_state().unicode_mode = UnicodeSendMode::WinCompose;
         keyboard.add_keypress(A, 0);
         keyboard.handle_keys().unwrap();
@@ -1178,8 +1181,8 @@ mod tests {
 
     #[test]
     fn test_panic_on_unhandled() {
-        let h = vec![Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>];
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.add_keypress(0xF0000u32, 0);
         assert!(keyboard.handle_keys().is_err());
     }
@@ -1200,12 +1203,10 @@ mod tests {
                 *dc += 1;
             },
         );
-        let h = vec![
-            Box::new(t) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(t));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
@@ -1286,12 +1287,10 @@ mod tests {
                 output.send_keys(&[KeyCode::I]);
             }),
         );
-        let h = vec![
-            Box::new(t) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(t));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
@@ -1316,12 +1315,11 @@ mod tests {
             KeyCode::A,
             LayerAction::RewriteTo(KeyCode::X.into()),
         )]);
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let layer_id = keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        keyboard.enable_handler(layer_id);
         keyboard.add_keypress(KeyCode::B, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::B, 0);
@@ -1356,7 +1354,7 @@ mod tests {
         );
 
         keyboard.output.clear();
-        keyboard.handlers[0].disable();
+        keyboard.disable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
@@ -1364,7 +1362,7 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
 
         keyboard.output.clear();
-        keyboard.handlers[0].enable();
+        keyboard.enable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
@@ -1389,12 +1387,10 @@ mod tests {
             },
         );
         let timeout = l.timeout_ms;
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         //simplest case, one press/release then another key
         keyboard.add_keypress(KeyCode::X, 0);
@@ -1494,12 +1490,10 @@ mod tests {
             |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::A]),
             |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::B]),
         );
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         //activate
         keyboard.add_keypress(KeyCode::X, 0);
@@ -1560,12 +1554,10 @@ mod tests {
         l.prefix.clear();
 
         let keyb = USBKeyboard::new();
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(keyb),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(keyb));
         keyboard.output.get_state().unicode_mode = UnicodeSendMode::Debug;
 
         //activate
@@ -1641,12 +1633,10 @@ mod tests {
                 output.send_keys(&[KeyCode::B])
             },
         );
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         //the tap...
         keyboard.add_keypress(KeyCode::X, 0);
@@ -1692,19 +1682,17 @@ mod tests {
     fn test_autoshift() {
         let threshold = 200;
         let l = AutoShift::new(threshold);
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(KeyCode::X, threshold-1);
+        keyboard.add_keyrelease(KeyCode::X, threshold - 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::X], &[]]);
         keyboard.output.clear();
@@ -1716,31 +1704,28 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(KeyCode::X, threshold+1);
+        keyboard.add_keyrelease(KeyCode::X, threshold + 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::X, KeyCode::LShift], &[]]);
         keyboard.output.clear();
-
     }
     #[test]
     fn test_autoshift_no_letters() {
         let threshold = 200;
         let mut l = AutoShift::new(threshold);
-        l.shift_letters=false;
-        let h = vec![
-            Box::new(l) as Box<dyn ProcessKeys<KeyOutCatcher>>,
-            Box::new(USBKeyboard::new()),
-        ];
+        l.shift_letters = false;
 
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(KeyCode::Kb1, threshold-1);
+        keyboard.add_keyrelease(KeyCode::Kb1, threshold - 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1], &[]]);
         keyboard.output.clear();
@@ -1752,7 +1737,7 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(KeyCode::Kb1, threshold+1);
+        keyboard.add_keyrelease(KeyCode::Kb1, threshold + 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LShift], &[]]);
@@ -1767,11 +1752,8 @@ mod tests {
 
     #[test]
     fn test_modifiers() {
-        let h = vec![
-            Box::new(USBKeyboard::new()) as Box<dyn ProcessKeys<KeyOutCatcher>>
-        ];
-
-        let mut keyboard = Keyboard::new(h, KeyOutCatcher::new());
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1832,6 +1814,38 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LGui]]);
-   }
- 
+    }
+
+    #[test]
+    fn test_enable_disable() {
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let prm = PressReleaseMacro::new(
+            KeyCode::A,
+            Some(|output: &mut KeyOutCatcher| {
+                output.send_keys(&[KeyCode::B]);
+            }),
+            Some(|output: &mut KeyOutCatcher| {
+                output.send_keys(&[KeyCode::C]);
+            }),
+        );
+        let no = keyboard.add_handler(Box::new(prm));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::B], &[]]);
+        keyboard.add_keyrelease(KeyCode::A, 10);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::B], &[], &[KeyCode::C], &[]]);
+
+        keyboard.output.clear();
+        keyboard.disable_handler(no);
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::A]]);
+        keyboard.add_keyrelease(KeyCode::A, 10);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::A], &[]]);
+    }
+
 }
