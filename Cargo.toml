@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 heapless = "0.4.4"
-#num_enum = "0.2.1"
-num_enum = {path = "../num_enum"}
+num_enum = "0.3.0"
+#num_enum = {path = "../num_enum"}
 no-std-compat = {version="0.1.0", features=["alloc", ]}
-
+smallbitvec = "2.4.0"

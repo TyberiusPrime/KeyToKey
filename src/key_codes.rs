@@ -1,6 +1,7 @@
 use alloc::{format, string::String};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+/// usb key codes
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum KeyCode {
@@ -34,7 +35,7 @@ pub enum KeyCode {
     X,
     Y,
     Z,   //29
-    Kb1, // Keyboard 1
+    Kb1, // Keyboard 1 30
     Kb2,
     Kb3, // 0x20
     Kb4,
@@ -43,16 +44,16 @@ pub enum KeyCode {
     Kb7,
     Kb8,
     Kb9,
-    Kb0,
+    Kb0, //40
     Enter,
     Escape,
     BSpace,
     Tab,
     Space,
-    Minus,
+    Minus, //0x2D - 45
     Equal,
     LBracket,
-    RBracket,  // 0x30
+    RBracket,  // 0x30 --48
     Bslash,    // \ (and |)
     NonUsHash, // Non-US # and ~ (Typically near the Enter key)
     SColon,    // ; (and :)

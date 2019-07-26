@@ -16,57 +16,18 @@
 #![no_std]
 
 mod key_codes;
+mod matrix;
+mod key_stream;
 
 extern crate alloc;
 extern crate no_std_compat;
 
 use crate::key_codes::KeyCode;
+use crate::key_stream::{Key, Event, EventStatus, iter_unhandled_mut};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 
 pub const UNICODE_BELOW_256: u32 = 0x100000;
-
-#[derive(PartialEq, Debug)]
-struct Key {
-    keycode: u32,
-    ms_since_last: u16,
-    running_number: u8,
-    flag: u8,
-}
-
-impl Key {
-    fn new(keycode: u32) -> Key {
-        Key {
-            keycode,
-            ms_since_last: 0,
-            running_number: 0,
-            flag: 0,
-        }
-    }
-}
-
-#[derive(PartialEq, Debug)]
-enum Event {
-    KeyPress(Key),
-    KeyRelease(Key),
-    TimeOut(u16),
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-enum EventStatus {
-    Unhandled,
-    Handled,
-    Ignored,
-}
-
-fn iter_unhandled_mut(
-    events: &mut Vec<(Event, EventStatus)>,
-) -> impl DoubleEndedIterator<Item = &mut (Event, EventStatus)> {
-    events
-        .iter_mut()
-        .filter(|(_e, status)| EventStatus::Unhandled == *status)
-}
-
 trait AcceptsKeycode {
     fn to_u32(&self) -> u32;
 }
