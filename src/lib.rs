@@ -18,6 +18,7 @@
 mod key_codes;
 mod matrix;
 mod key_stream;
+mod test_helpers;
 
 extern crate alloc;
 extern crate no_std_compat;
@@ -50,7 +51,7 @@ impl AcceptsKeycode for KeyCode {
     }
 }
 
-struct KeyboardState {
+pub struct KeyboardState {
     shift: bool,
     ctrl: bool,
     alt: bool,
@@ -69,7 +70,7 @@ impl KeyboardState {
     }
 }
 
-struct Keyboard<'a, T: USBKeyOut> {
+pub struct Keyboard<'a, T: USBKeyOut> {
     events: Vec<(Event, EventStatus)>,
     running_number: u8,
     handlers: Vec<Box<dyn ProcessKeys<T> + 'a>>,
@@ -129,6 +130,12 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         }
         Ok(())
     }
+
+    fn clear_unhandled(&mut self) {
+        self.events.drain_filter(|(_event, status)| {
+            (EventStatus::Unhandled == *status)
+                });
+        }
 
     fn add_keypress<X: AcceptsKeycode>(&mut self, keycode: X, ms_since_last: u16) {
         let e = Key {
@@ -215,18 +222,18 @@ fn hex_digit_to_keycode(digit: char) -> KeyCode {
     }
 }
 
-trait USBKeyOut {
+pub trait USBKeyOut {
     fn send_keys(&mut self, keys: &[KeyCode]);
     fn register_key(&mut self, key: KeyCode);
     fn send_registered(&mut self);
     fn send_empty(&mut self);
 
-    fn get_state(&mut self) -> &mut KeyboardState;
+    fn state(&mut self) -> &mut KeyboardState;
 
     //fn get_unicode_mode(&self) -> UnicodeSendMode;
     //fn set_unicode_mode(&mut self, mode: UnicodeSendMode);
     fn send_unicode(&mut self, c: char) {
-        match self.get_state().unicode_mode {
+        match self.state().unicode_mode {
             UnicodeSendMode::Linux => {
                 self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, KeyCode::U]);
                 let escaped = c.escape_unicode();
@@ -331,16 +338,16 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             }
         }
         //dbg!(&result);
-        if output.get_state().shift {
+        if output.state().shift {
             output.register_key(KeyCode::LShift);
         }
-        if output.get_state().ctrl {
+        if output.state().ctrl {
             output.register_key(KeyCode::LCtrl);
         }
-        if output.get_state().alt {
+        if output.state().alt {
             output.register_key(KeyCode::LAlt);
         }
-        if output.get_state().meta {
+        if output.state().meta {
             output.register_key(KeyCode::LGui);
         }
 
@@ -956,6 +963,9 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
 #[macro_use]
 extern crate std;
 mod tests {
+    #[allow(unused_imports)]
+    use crate::test_helpers::{KeyOutCatcher, check_output};
+    #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
 
     #[allow(unused_imports)]
@@ -964,6 +974,7 @@ mod tests {
         OneShot, PressReleaseMacro, ProcessKeys, SpaceCadet, StickyMacro, TapDance, USBKeyOut,
         USBKeyboard, UnicodeKeyboard, UnicodeSendMode, UNICODE_BELOW_256,
     };
+    #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
     #[allow(unused_imports)]
@@ -971,58 +982,7 @@ mod tests {
     #[allow(unused_imports)]
     use no_std_compat::rc::Rc;
 
-    struct KeyOutCatcher {
-        keys_registered: Vec<u8>,
-        reports: Vec<Vec<u8>>,
-        state: KeyboardState,
-    }
-    impl KeyOutCatcher {
-        fn new() -> KeyOutCatcher {
-            KeyOutCatcher {
-                keys_registered: Vec::new(),
-                reports: Vec::new(),
-                state: KeyboardState::new(),
-            }
-        }
-        // for testing, clear the catcher of everything
-        fn clear(&mut self) {
-            self.keys_registered.clear();
-            self.reports.clear();
-        }
-    }
-    impl USBKeyOut for KeyOutCatcher {
-        fn get_state(&mut self) -> &mut KeyboardState {
-            return &mut self.state;
-        }
-
-        fn send_keys(&mut self, keys: &[KeyCode]) {
-            self.reports
-                .push(keys.into_iter().map(|&x| x.into()).collect());
-        }
-        fn register_key(&mut self, key: KeyCode) {
-            if !self.keys_registered.iter().any(|x| *x == key.into()) {
-                self.keys_registered.push(key.into());
-            }
-        }
-        fn send_registered(&mut self) {
-            self.reports.push(self.keys_registered.clone());
-            self.keys_registered.clear();
-        }
-        fn send_empty(&mut self) {
-            self.reports.push(Vec::new());
-        }
-    }
-    fn check_output(keyboard: &Keyboard<KeyOutCatcher>, should: &[&[KeyCode]]) {
-        assert!(should.len() == keyboard.output.reports.len());
-        for (ii, report) in should.iter().enumerate() {
-            assert!(keyboard.output.reports[ii].len() == report.len());
-            for k in report.iter() {
-                let kcu: u8 = (*k).into();
-                assert!(keyboard.output.reports[ii].contains(&kcu));
-            }
-        }
-    }
-    #[test]
+        #[test]
     fn test_usbkeyboard_single_key() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1039,7 +999,7 @@ mod tests {
     }
     #[test]
     fn test_usbkeyboard_multiple_key() {
-        use KeyCode::*;
+        use crate::key_codes::KeyCode::*;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.add_keypress(A, 0);
@@ -1070,11 +1030,11 @@ mod tests {
 
     #[test]
     fn test_unicode_keyboard_linux() {
-        use KeyCode::*;
+        use crate::key_codes::KeyCode::*;
         let ub = UnicodeKeyboard {};
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(ub));
-        keyboard.output.get_state().unicode_mode = UnicodeSendMode::Linux;
+        keyboard.output.state().unicode_mode = UnicodeSendMode::Linux;
         //no output on press
         keyboard.add_keypress(0x00E4u32 + UNICODE_BELOW_256, 0);
         keyboard.handle_keys().unwrap();
@@ -1098,11 +1058,11 @@ mod tests {
 
     #[test]
     fn test_unicode_keyboard_wincompose() {
-        use KeyCode::*;
+        use crate::key_codes::KeyCode::*;
         let ub = UnicodeKeyboard {};
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(ub));
-        keyboard.output.get_state().unicode_mode = UnicodeSendMode::WinCompose;
+        keyboard.output.state().unicode_mode = UnicodeSendMode::WinCompose;
         //no output on press
         keyboard.add_keypress(0x03B4u32, 0);
         keyboard.handle_keys().unwrap();
@@ -1117,11 +1077,11 @@ mod tests {
 
     #[test]
     fn test_unicode_while_depressed() {
-        use KeyCode::*;
+        use crate::key_codes::KeyCode::*;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(UnicodeKeyboard {}));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.output.get_state().unicode_mode = UnicodeSendMode::WinCompose;
+        keyboard.output.state().unicode_mode = UnicodeSendMode::WinCompose;
         keyboard.add_keypress(A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[A]]);
@@ -1519,7 +1479,7 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(keyb));
-        keyboard.output.get_state().unicode_mode = UnicodeSendMode::Debug;
+        keyboard.output.state().unicode_mode = UnicodeSendMode::Debug;
 
         //activate
         keyboard.add_keypress(KeyCode::X, 0);
@@ -1726,7 +1686,7 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.output.get_state().shift = true;
+        keyboard.output.state().shift = true;
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1738,8 +1698,8 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LShift]]);
         keyboard.output.clear();
 
-        keyboard.output.get_state().shift = false;
-        keyboard.output.get_state().ctrl = true;
+        keyboard.output.state().shift = false;
+        keyboard.output.state().ctrl = true;
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1751,8 +1711,8 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LCtrl]]);
         keyboard.output.clear();
 
-        keyboard.output.get_state().ctrl = false;
-        keyboard.output.get_state().alt = true;
+        keyboard.output.state().ctrl = false;
+        keyboard.output.state().alt = true;
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1764,8 +1724,8 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LAlt]]);
         keyboard.output.clear();
 
-        keyboard.output.get_state().alt = false;
-        keyboard.output.get_state().meta = true;
+        keyboard.output.state().alt = false;
+        keyboard.output.state().meta = true;
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
