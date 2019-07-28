@@ -40,4 +40,3 @@ pub fn iter_unhandled_mut(
         .iter_mut()
         .filter(|(_e, status)| EventStatus::Unhandled == *status)
 }
-

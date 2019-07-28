@@ -137,3 +137,25 @@ impl Into<u32> for KeyCode {
         return r as u32;
     }
 }
+
+pub trait AcceptsKeycode {
+    fn to_u32(&self) -> u32;
+}
+
+impl AcceptsKeycode for u32 {
+    fn to_u32(&self) -> u32 {
+        *self
+    }
+}
+impl AcceptsKeycode for i32 {
+    fn to_u32(&self) -> u32 {
+        (*self) as u32
+    }
+}
+
+impl AcceptsKeycode for KeyCode {
+    fn to_u32(&self) -> u32 {
+        let r: u32 = (*self).into();
+        r
+    }
+}
