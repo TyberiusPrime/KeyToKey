@@ -1,4 +1,4 @@
-use crate::key_codes::{AcceptsKeycode, KeyCode};
+use crate::key_codes::{AcceptsKeycode, KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
@@ -34,6 +34,10 @@ impl USBKeyboard {
     }
 }
 
+fn is_usb_keycode(kc: u32) -> bool{
+    return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256  + 0xE7; //RGui
+}
+
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
@@ -43,7 +47,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             //note that we're doing this in reverse, ie. releases happen before presses.
             match e {
                 Event::KeyRelease(kc) => {
-                    if kc.keycode < 256 {
+                    if is_usb_keycode(kc.keycode) {
                         if !codes_to_delete.contains(&kc.keycode) {
                             codes_to_delete.push(kc.keycode);
                         }
@@ -98,8 +102,8 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                             modifiers_sent.set(3, true);
                         }
                     }
-                    if kc.keycode < 256 {
-                        let oc: Result<KeyCode, String> = (kc.keycode as u8).try_into();
+                    if is_usb_keycode(kc.keycode) {
+                        let oc: Result<KeyCode, String> = (kc.keycode).try_into();
                         match oc {
                             Ok(x) => {
                                 if send {
@@ -146,7 +150,7 @@ pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
     fn is_unicode_keycode(keycode: u32) -> bool {
         match keycode {
-            0..=0xFF => false,            //these we ignore
+            0x100000..=0x1000FF => false, //these are the usb codes
             0xF0000..=0xFFFFD => false,   //unicode private character range A
             0x1000FF..=0x10FFFD => false, //unicode private character range b (minus those we use for codes < 256)
             _ => true,
@@ -769,7 +773,7 @@ mod tests {
         StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
     };
     #[allow(unused_imports)]
-    use crate::{Keyboard, KeyboardState, USBKeyOut, UnicodeSendMode, UNICODE_BELOW_256};
+    use crate::{Keyboard, KeyboardState, USBKeyOut, UnicodeSendMode};
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
@@ -832,12 +836,12 @@ mod tests {
         keyboard.add_handler(Box::new(ub));
         keyboard.output.state().unicode_mode = UnicodeSendMode::Linux;
         //no output on press
-        keyboard.add_keypress(0x00E4u32 + UNICODE_BELOW_256, 0);
+        keyboard.add_keypress(0x00E4u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.reports.len() == 0);
         assert!(keyboard.events.is_empty()); // we eat the keypress though
 
-        keyboard.add_keyrelease(0x00E4 + UNICODE_BELOW_256, 0);
+        keyboard.add_keyrelease(0x00E4, 0);
         keyboard.handle_keys().unwrap();
         check_output(
             &keyboard,
@@ -880,6 +884,8 @@ mod tests {
         keyboard.output.state().unicode_mode = UnicodeSendMode::WinCompose;
         keyboard.add_keypress(A, 0);
         keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+
         check_output(&keyboard, &[&[A]]);
         keyboard.output.clear();
         keyboard.add_keypress(0x3B4u32, 0);

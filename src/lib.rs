@@ -25,16 +25,10 @@ extern crate alloc;
 extern crate no_std_compat;
 
 pub use crate::handlers::*;
-use crate::key_codes::{AcceptsKeycode, KeyCode};
+use crate::key_codes::{AcceptsKeycode, KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus, Key};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
-
-// here because the external users will need it.
-/// If you want to send a Unicode below id=256
-/// you'll need to add this value, otherwise
-/// you'll be sending standard USB keycodes instead.
-pub const UNICODE_BELOW_256: u32 = 0x100000;
 
 /// current keyboard state.
 #[derive(Debug)]
@@ -255,7 +249,9 @@ pub trait USBKeyOut {
             UnicodeSendMode::Debug => {
                 let mut buf = [0, 0, 0, 0];
                 c.encode_utf8(&mut buf);
-                self.send_keys(&[buf[0].try_into().unwrap()]);
+                self.send_keys(&[(
+                    (buf[0] as u32) + UNICODE_BELOW_256)
+                    .try_into().unwrap()]);
             }
         }
     }

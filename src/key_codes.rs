@@ -1,11 +1,19 @@
 use alloc::{format, string::String};
+use core::convert::{TryFrom, TryInto};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-/// usb key codes
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive)]
-#[repr(u8)]
+// here because the external users will need it.
+/// If you want to send a Unicode below id=256
+/// you'll need to add this value, otherwise
+/// you'll be sending standard USB keycodes instead.
+pub const UNICODE_BELOW_256: u32 = 0x100000;
+
+
+/// usb key codes mapped into the first private region of unicode
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive, Debug)]
+#[repr(u32)]
 pub enum KeyCode {
-    No = 0x00,
+    No = UNICODE_BELOW_256,
     ErrorRollOver,
     PostFail,
     ErrorUndefined,
@@ -109,7 +117,7 @@ pub enum KeyCode {
     Application, // 0x65
 
     // Modifiers
-    LCtrl = 0xE0,
+    LCtrl = 0xE0 + UNICODE_BELOW_256,
     LShift,
     LAlt,
     LGui,
@@ -124,17 +132,24 @@ impl KeyCode {
     }
     pub fn as_modifier_bit(self) -> u8 {
         if self.is_modifier() {
-            1 << (self as u8 - KeyCode::LCtrl as u8)
+            1 << (self.to_u8()- KeyCode::LCtrl.to_u8())
         } else {
             0
         }
     }
+
+    pub fn to_u8(self) -> u8
+    {
+        let u = (self as u32) - UNICODE_BELOW_256;
+        return u as u8;
+    }
 }
 
-impl Into<u32> for KeyCode {
-    fn into(self) -> u32 {
-        let r: u8 = self.into();
-        return r as u32;
+impl TryFrom<u8> for KeyCode {
+    type Error = String;
+    fn try_from(ii: u8) -> Result<KeyCode, Self::Error> {
+        let x: u32 = (ii as u32)+ UNICODE_BELOW_256;
+        return x.try_into();
     }
 }
 

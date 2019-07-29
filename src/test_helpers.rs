@@ -31,11 +31,11 @@ impl USBKeyOut for KeyOutCatcher {
 
     fn send_keys(&mut self, keys: &[KeyCode]) {
         self.reports
-            .push(keys.into_iter().map(|&x| x.into()).collect());
+            .push(keys.into_iter().map(|&x| x.to_u8()).collect());
     }
     fn register_key(&mut self, key: KeyCode) {
-        if !self.keys_registered.iter().any(|x| *x == key.into()) {
-            self.keys_registered.push(key.into());
+        if !self.keys_registered.iter().any(|x| *x == key.to_u8()) {
+            self.keys_registered.push(key.to_u8());
         }
     }
     fn send_registered(&mut self) {
@@ -51,7 +51,7 @@ pub fn check_output(keyboard: &Keyboard<KeyOutCatcher>, should: &[&[KeyCode]]) {
     for (ii, report) in should.iter().enumerate() {
         assert!(keyboard.output.reports[ii].len() == report.len());
         for k in report.iter() {
-            let kcu: u8 = (*k).into();
+            let kcu: u8 = (*k).to_u8();
             assert!(keyboard.output.reports[ii].contains(&kcu));
         }
     }
