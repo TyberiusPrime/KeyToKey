@@ -2,6 +2,7 @@ use crate::key_codes::{AcceptsKeycode, KeyCode};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
+use smallbitvec::sbvec;
 
 use crate::USBKeyOut;
 
@@ -37,6 +38,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
         let mut codes_to_delete: Vec<u32> = Vec::new();
+        let mut modifiers_sent = sbvec![false; 4];
         for (e, status) in iter_unhandled_mut(events).rev() {
             //note that we're doing this in reverse, ie. releases happen before presses.
             match e {
@@ -46,6 +48,22 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                             codes_to_delete.push(kc.keycode);
                         }
                         *status = EventStatus::Handled;
+                    }
+                    if kc.keycode == KeyCode::LShift.into() || kc.keycode == KeyCode::RShift.into()
+                    {
+                        output.state().shift = false;
+                    } else if kc.keycode == KeyCode::LAlt.into()
+                        || kc.keycode == KeyCode::RAlt.into()
+                    {
+                        output.state().alt = false;
+                    } else if kc.keycode == KeyCode::LCtrl.into()
+                        || kc.keycode == KeyCode::RCtrl.into()
+                    {
+                        output.state().ctrl = false;
+                    } else if kc.keycode == KeyCode::LGui.into()
+                        || kc.keycode == KeyCode::RGui.into()
+                    {
+                        output.state().meta = false;
                     }
                 }
                 Event::KeyPress(kc) => {
@@ -58,6 +76,27 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         }
                     } else {
                         send = true;
+                        if kc.keycode == KeyCode::LShift.into()
+                            || kc.keycode == KeyCode::RShift.into()
+                        {
+                            output.state().shift = true;
+                            modifiers_sent.set(0, true);
+                        } else if kc.keycode == KeyCode::LAlt.into()
+                            || kc.keycode == KeyCode::RAlt.into()
+                        {
+                            output.state().alt = true;
+                            modifiers_sent.set(1, true);
+                        } else if kc.keycode == KeyCode::LCtrl.into()
+                            || kc.keycode == KeyCode::RCtrl.into()
+                        {
+                            output.state().ctrl = true;
+                            modifiers_sent.set(2, true);
+                        } else if kc.keycode == KeyCode::LGui.into()
+                            || kc.keycode == KeyCode::RGui.into()
+                        {
+                            output.state().meta = true;
+                            modifiers_sent.set(3, true);
+                        }
                     }
                     if kc.keycode < 256 {
                         let oc: Result<KeyCode, String> = (kc.keycode as u8).try_into();
@@ -78,17 +117,16 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                 Event::TimeOut(_) => {}
             }
         }
-        //dbg!(&result);
-        if output.state().shift {
+        if output.state().shift && !modifiers_sent[0] {
             output.register_key(KeyCode::LShift);
         }
-        if output.state().ctrl {
-            output.register_key(KeyCode::LCtrl);
-        }
-        if output.state().alt {
+        if output.state().alt && !modifiers_sent[1] {
             output.register_key(KeyCode::LAlt);
         }
-        if output.state().meta {
+        if output.state().ctrl && !modifiers_sent[2] {
+            output.register_key(KeyCode::LCtrl);
+        }
+        if output.state().meta && !modifiers_sent[3] {
             output.register_key(KeyCode::LGui);
         }
 
@@ -244,6 +282,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
 
 pub enum LayerAction<'a> {
     RewriteTo(u32),
+    RewriteToShifted(u32, u32),
     //todo: rewrite shift
     SendString(&'a str),
     //    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
@@ -274,6 +313,13 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                 LayerAction::RewriteTo(to_keycode) => {
                                     kc.keycode = *to_keycode;
                                 }
+                                LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
+                                    if output.state().shift {
+                                        kc.keycode = *to_shifted_keycode;
+                                    } else {
+                                        kc.keycode = *to_keycode;
+                                    }
+                                }
                                 LayerAction::SendString(s) => {
                                     output.send_string(s);
                                     *status = EventStatus::Handled;
@@ -289,7 +335,14 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                 LayerAction::RewriteTo(to_keycode) => {
                                     kc.keycode = *to_keycode;
                                 }
-                                _ => *status = EventStatus::Handled,
+                                LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
+                                    if output.state().shift {
+                                        kc.keycode = *to_shifted_keycode;
+                                    } else {
+                                        kc.keycode = *to_keycode;
+                                    }
+                                }
+                                LayerAction::SendString(_) => *status = EventStatus::Handled,
                             }
                         }
                     }
@@ -972,7 +1025,6 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::I], &[]]);
         keyboard.output.clear();
     }
-
     #[test]
     fn test_layer_rewrite() {
         let l = Layer::new(vec![(
@@ -1037,6 +1089,45 @@ mod tests {
         // I suspect that we will keep repeating one of the keycodes.
         // what would be the sensible thing to happen? How can we achive this?
         // possibly by clearing the keyboard events whenever a layer toggle happens?
+    }
+    #[test]
+    fn test_layer_rewrite_shifted() {
+        let l = Layer::new(vec![(
+            KeyCode::A,
+            LayerAction::RewriteToShifted(KeyCode::M.into(), KeyCode::Z.into()),
+        )]);
+
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let layer_id = keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        keyboard.enable_handler(layer_id);
+        assert!(!keyboard.output.state().shift);
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::M], &[]]);
+        keyboard.output.clear();
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+        check_output(
+            &keyboard,
+            &[&[KeyCode::LShift], &[KeyCode::LShift, KeyCode::Z]],
+        );
+        assert!(keyboard.output.state().shift);
+        keyboard.output.clear();
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        keyboard.output.clear();
+        keyboard.add_keyrelease(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        dbg!(keyboard.output.state());
+        assert!(!(keyboard.output.state().shift));
+        check_output(&keyboard, &[&[]]);
     }
 
     #[test]
@@ -1415,7 +1506,7 @@ mod tests {
     }
 
     #[test]
-    fn test_modifiers() {
+    fn test_modifiers_add_left_keycodes() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
@@ -1478,6 +1569,196 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LGui]]);
+    }
+    #[test]
+    fn test_modifiers_set_by_keycodes() {
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        assert!(keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::LAlt, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::LCtrl, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[KeyCode::LShift, KeyCode::LAlt, KeyCode::LCtrl]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::LGui, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[
+                KeyCode::LShift,
+                KeyCode::LAlt,
+                KeyCode::LCtrl,
+                KeyCode::LGui,
+            ]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::LGui, 0);
+        keyboard.handle_keys().unwrap();
+
+        check_output(
+            &keyboard,
+            &[&[KeyCode::LShift, KeyCode::LAlt, KeyCode::LCtrl]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::LCtrl, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::LAlt, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        assert!(keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[]]);
+        assert!(!keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::RShift]]);
+        assert!(keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::RAlt, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::RCtrl, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[KeyCode::RShift, KeyCode::RAlt, KeyCode::RCtrl]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::RGui, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[
+                KeyCode::RShift,
+                KeyCode::RAlt,
+                KeyCode::RCtrl,
+                KeyCode::RGui,
+            ]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::RGui, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[KeyCode::RShift, KeyCode::RAlt, KeyCode::RCtrl]],
+        );
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::RCtrl, 0);
+        keyboard.handle_keys().unwrap();
+
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::RAlt, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::RShift]]);
+        assert!(keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[]]);
+        assert!(!keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.add_keypress(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::RShift]]);
+        assert!(keyboard.output.state().shift);
+        assert!(!keyboard.output.state().alt);
+        assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().meta);
+        keyboard.output.clear();
     }
 
     #[test]

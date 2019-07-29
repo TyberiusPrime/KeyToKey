@@ -1,18 +1,20 @@
 //todo:
-//debug Processor that ouputs whatever is being seen?
-// combos - tricky, but straight forward
-// tapdance, on_each_tap, and max_taps?
+// shift remaps on layers (ie. disassociate the premade shift-combos)
+// combos
+// tapdance enhancemeants, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
 
 // premade toggle/oneshot modifiers
 // key lock (repeat next key until it is pressed again)
 // mouse keys? - probably out of scope of this libary
 // steganograpyh
+// unsupported: disabling a layer when one of it's rewriteTo are active?
 
 #![allow(dead_code)]
 #![feature(drain_filter)]
 #![no_std]
 
+mod debug_handlers;
 mod handlers;
 mod key_codes;
 mod key_stream;
@@ -35,6 +37,7 @@ use no_std_compat::prelude::v1::*;
 pub const UNICODE_BELOW_256: u32 = 0x100000;
 
 /// current keyboard state.
+#[derive(Debug)]
 pub struct KeyboardState {
     shift: bool,
     ctrl: bool,
@@ -179,7 +182,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
 /// as different key combinations
 /// unfortunatly, we can't detect what we're connected to,
 /// so the keyboard needs to provide some kinde of switch key.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum UnicodeSendMode {
     //default X
     Linux = 1,
