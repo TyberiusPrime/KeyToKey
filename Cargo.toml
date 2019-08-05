@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Tyberius Prime <tyberius_prime@coonabibba.de>"]
 edition = "2018"
 
+description = "A keyboard firmware library turning event streams of key presses into reports for USB"
+repository = "https://github.com/TyberiusPrime/KeyToKey"
+license = "MIT"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
