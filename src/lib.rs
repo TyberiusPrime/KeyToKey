@@ -19,10 +19,12 @@ pub mod handlers;
 mod key_codes;
 mod key_stream;
 mod matrix;
+pub mod premade;
 mod test_helpers;
 
 extern crate alloc;
 extern crate no_std_compat;
+extern crate spin;
 
 pub use crate::handlers::ProcessKeys;
 use crate::key_codes::UNICODE_BELOW_256;
@@ -306,6 +308,3 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
 #[cfg(test)]
 #[macro_use]
 extern crate std;
-
-#[cfg(test)]
-extern crate parking_lot;

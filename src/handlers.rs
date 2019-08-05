@@ -381,49 +381,45 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
     }
 }
 
+///A trait for macro callbacks
+pub trait MacroCallback {
+    fn on_activate(&mut self, output: &mut impl USBKeyOut);
+    fn on_deactivate(&mut self, output: &mut impl USBKeyOut);
+}
+
 /// The simples callback -
 /// call on_press(output: impl USBKeyOut) on key press
 /// and on_release(output) on release))
 /// trigger may be any keycode,
 /// but preferentialy from the region 0xF00FF..=0xFFFFD
 /// which is not used by either UnicodeKeyboard or UsbKeyboard
-pub struct PressReleaseMacro<'a, T, F1, F2> {
+pub struct PressReleaseMacro<M> {
     keycode: u32,
-    on_press: F1,
-    on_release: F2,
-    phantom: core::marker::PhantomData<&'a T>,
+    callbacks: M,
 }
-impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> PressReleaseMacro<'a, T, F1, F2> {
-    pub fn new(
-        trigger: impl AcceptsKeycode,
-        on_press: F1,
-        on_release: F2,
-    ) -> PressReleaseMacro<'a, T, F1, F2> {
+impl<M: MacroCallback> PressReleaseMacro<M> {
+    pub fn new(trigger: impl AcceptsKeycode, callbacks: M) -> PressReleaseMacro<M> {
         PressReleaseMacro {
             keycode: trigger.to_u32(),
-            on_press,
-            on_release,
-            phantom: core::marker::PhantomData,
+            callbacks,
         }
     }
 }
 
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
-    for PressReleaseMacro<'_, T, F1, F2>
-{
+impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
             match event {
                 Event::KeyPress(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
-                        (self.on_press)(output);
+                        self.callbacks.on_activate(output);
                     }
                 }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
-                        (self.on_release)(output);
+                        self.callbacks.on_deactivate(output);
                     }
                 }
                 Event::TimeOut(_) => {}
@@ -829,8 +825,8 @@ mod tests {
     use crate::test_helpers::{check_output, KeyOutCatcher};
 
     use crate::handlers::{
-        AutoShift, Layer, LayerAction, Leader, MatchResult, OneShot, PressReleaseMacro, SpaceCadet,
-        StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
+        AutoShift, Layer, LayerAction, Leader, MacroCallback, MatchResult, OneShot,
+        PressReleaseMacro, SpaceCadet, StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
     };
     #[allow(unused_imports)]
     use crate::{
@@ -839,7 +835,8 @@ mod tests {
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
-    use parking_lot::RwLock; //todo: figure out how to do this embeded
+    use alloc::sync::Arc;
+    use spin::RwLock;
 
     pub struct Debugger {
         s: String,
@@ -1075,22 +1072,25 @@ mod tests {
 
     #[test]
     fn test_press_release() {
-        let down_counter = RwLock::new(0);
-        let up_counter = RwLock::new(0);
-        let t = PressReleaseMacro::new(
-            0xF0000u32,
-            |output: &mut KeyOutCatcher| {
-                //todo: why do we need to define the type here?
+        struct PressCounter {
+            down_counter: u8,
+            up_counter: u8,
+        }
+        impl MacroCallback for Arc<RwLock<PressCounter>> {
+            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+                self.write().down_counter += 1;
                 output.send_keys(&[KeyCode::H]);
-                let mut dc = down_counter.write();
-                *dc += 1;
-            },
-            |output: &mut KeyOutCatcher| {
-                let mut dc = up_counter.write();
-                *dc += 1;
+            }
+            fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+                self.write().up_counter += 1;
                 output.send_keys(&[KeyCode::I]);
-            },
-        );
+            }
+        }
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let t = PressReleaseMacro::new(0xF0000u32, counter.clone());
 
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
@@ -1098,8 +1098,8 @@ mod tests {
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 0);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
@@ -1107,8 +1107,8 @@ mod tests {
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 1);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
         check_output(&keyboard, &[&[KeyCode::I], &[]]);
         keyboard.output.clear();
     }
@@ -1852,16 +1852,18 @@ mod tests {
 
     #[test]
     fn test_enable_disable() {
-        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let prm = PressReleaseMacro::new(
-            KeyCode::A,
-            |output: &mut KeyOutCatcher| {
+        struct PressCounter {}
+        impl MacroCallback for PressCounter {
+            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
                 output.send_keys(&[KeyCode::B]);
-            },
-            |output: &mut KeyOutCatcher| {
+            }
+            fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
                 output.send_keys(&[KeyCode::C]);
-            },
-        );
+            }
+        }
+
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let prm = PressReleaseMacro::new(KeyCode::A, PressCounter {});
         let no = keyboard.add_handler(Box::new(prm));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
