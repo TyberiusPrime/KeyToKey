@@ -59,7 +59,7 @@ pub enum KeyCode {
     Equal,
     LBracket,
     RBracket,  // 0x30 --48
-    Bslash,    // \ (and |)
+    BSlash,    // \ (and |)
     NonUsHash, // Non-US # and ~ (Typically near the Enter key)
     SColon,    // ; (and :)
     Quote,     // ' and "

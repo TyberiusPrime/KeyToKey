@@ -40,6 +40,7 @@ pub struct KeyboardState {
     pub alt: bool,
     pub meta: bool,
     pub unicode_mode: UnicodeSendMode,
+    enabled_handlers: Vec<bool>,
 }
 
 impl KeyboardState {
@@ -50,7 +51,23 @@ impl KeyboardState {
             alt: false,
             meta: false,
             unicode_mode: UnicodeSendMode::Linux,
+            enabled_handlers: Vec::new(),
         }
+    }
+    pub fn enable_handler(&mut self, no: HandlerID) {
+        self.enabled_handlers[no] = true;
+    }
+
+    pub fn disable_handler(&mut self, no: HandlerID) {
+        self.enabled_handlers[no] = false;
+    }
+
+    pub fn toggle_handler(&mut self, no: HandlerID) {
+        self.enabled_handlers[no] = !self.enabled_handlers[no];
+    }
+
+    pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
+        self.enabled_handlers[no]
     }
 }
 
@@ -63,7 +80,6 @@ pub struct Keyboard<'a, T: USBKeyOut> {
     events: Vec<(Event, EventStatus)>,
     running_number: u8,
     handlers: Vec<Box<dyn ProcessKeys<T> + Send + 'a>>,
-    enabled: Vec<bool>,
     pub output: T,
 }
 
@@ -75,7 +91,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
             events: Vec::new(),
             running_number: 0,
             handlers: Vec::new(),
-            enabled: Vec::new(), //possibly replace by fancy bit addresing variant?
             output,
         }
     }
@@ -85,21 +100,12 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     ///
     /// by default, most handlers start in the enabled state.
     pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + Send + 'a>) -> HandlerID {
-        self.enabled.push(handler.default_enabled());
+        self.output
+            .state()
+            .enabled_handlers
+            .push(handler.default_enabled());
         self.handlers.push(handler);
         return self.handlers.len() - 1;
-    }
-
-    pub fn enable_handler(&mut self, no: HandlerID) {
-        self.enabled[no] = true;
-    }
-
-    pub fn disable_handler(&mut self, no: HandlerID) {
-        self.enabled[no] = false;
-    }
-
-    pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
-        self.enabled[no]
     }
 
     /// handle an update to the event stream
@@ -112,7 +118,8 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
-        for (h, e) in self.handlers.iter_mut().zip(self.enabled.iter()) {
+        let enabled = self.output.state().enabled_handlers.clone();
+        for (h, e) in self.handlers.iter_mut().zip(enabled.iter()) {
             if *e {
                 h.process_keys(&mut self.events, &mut self.output);
             }

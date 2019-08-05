@@ -389,15 +389,15 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
 /// which is not used by either UnicodeKeyboard or UsbKeyboard
 pub struct PressReleaseMacro<'a, T, F1, F2> {
     keycode: u32,
-    on_press: Option<F1>,
-    on_release: Option<F2>,
+    on_press: F1,
+    on_release: F2,
     phantom: core::marker::PhantomData<&'a T>,
 }
 impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> PressReleaseMacro<'a, T, F1, F2> {
     pub fn new(
         trigger: impl AcceptsKeycode,
-        on_press: Option<F1>,
-        on_release: Option<F2>,
+        on_press: F1,
+        on_release: F2,
     ) -> PressReleaseMacro<'a, T, F1, F2> {
         PressReleaseMacro {
             keycode: trigger.to_u32(),
@@ -417,19 +417,13 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                 Event::KeyPress(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
-                        match &mut self.on_press {
-                            Some(x) => (*x)(output),
-                            None => {}
-                        }
+                        (self.on_press)(output);
                     }
                 }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.keycode {
                         *status = EventStatus::Handled;
-                        match &mut self.on_release {
-                            Some(x) => (*x)(output),
-                            None => {}
-                        }
+                        (self.on_release)(output);
                     }
                 }
                 Event::TimeOut(_) => {}
@@ -779,6 +773,52 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
     }
 }
 
+/// A layer that maps qwerty to dvorak.
+/// Don't forget to enable it, layers are off by default
+pub fn dvorak<'a>() -> Layer<'a> {
+    use LayerAction::RewriteTo;
+    Layer::new(vec![
+        (KeyCode::Q, RewriteTo(KeyCode::Quote.to_u32())),
+        (KeyCode::W, RewriteTo(KeyCode::Comma.to_u32())),
+        (KeyCode::E, RewriteTo(KeyCode::Dot.to_u32())),
+        (KeyCode::R, RewriteTo(KeyCode::P.to_u32())),
+        (KeyCode::T, RewriteTo(KeyCode::Y.to_u32())),
+        (KeyCode::Y, RewriteTo(KeyCode::F.to_u32())),
+        (KeyCode::U, RewriteTo(KeyCode::G.to_u32())),
+        (KeyCode::I, RewriteTo(KeyCode::C.to_u32())),
+        (KeyCode::O, RewriteTo(KeyCode::R.to_u32())),
+        (KeyCode::P, RewriteTo(KeyCode::L.to_u32())),
+        //(KeyCode::A, RewriteTo(KeyCode::A.to_u32())),
+        (KeyCode::S, RewriteTo(KeyCode::O.to_u32())),
+        (KeyCode::D, RewriteTo(KeyCode::E.to_u32())),
+        (KeyCode::F, RewriteTo(KeyCode::U.to_u32())),
+        (KeyCode::G, RewriteTo(KeyCode::I.to_u32())),
+        (KeyCode::H, RewriteTo(KeyCode::D.to_u32())),
+        (KeyCode::J, RewriteTo(KeyCode::H.to_u32())),
+        (KeyCode::K, RewriteTo(KeyCode::T.to_u32())),
+        (KeyCode::L, RewriteTo(KeyCode::N.to_u32())),
+        (KeyCode::SColon, RewriteTo(KeyCode::S.to_u32())),
+        (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
+        (KeyCode::Z, RewriteTo(KeyCode::SColon.to_u32())),
+        (KeyCode::X, RewriteTo(KeyCode::Q.to_u32())),
+        (KeyCode::C, RewriteTo(KeyCode::J.to_u32())),
+        (KeyCode::V, RewriteTo(KeyCode::K.to_u32())),
+        (KeyCode::B, RewriteTo(KeyCode::X.to_u32())),
+        (KeyCode::N, RewriteTo(KeyCode::B.to_u32())),
+        (KeyCode::M, RewriteTo(KeyCode::M.to_u32())),
+        (KeyCode::Comma, RewriteTo(KeyCode::W.to_u32())),
+        (KeyCode::Dot, RewriteTo(KeyCode::V.to_u32())),
+        (KeyCode::Slash, RewriteTo(KeyCode::Z.to_u32())),
+        //(KeyCode::BSlash, RewriteTo(KeyCode::Bslash.to_u32())),
+        (KeyCode::Equal, RewriteTo(KeyCode::LBracket.to_u32())),
+        (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
+        (KeyCode::RBracket, RewriteTo(KeyCode::Slash.to_u32())),
+        //(KeyCode::Grave, RewriteTo(KeyCode::Grave.to_u32())),
+        (KeyCode::Minus, RewriteTo(KeyCode::RBracket.to_u32())),
+        (KeyCode::LBracket, RewriteTo(KeyCode::Slash.to_u32())),
+    ])
+}
+
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
@@ -812,7 +852,7 @@ mod tests {
     }
 
     impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
-        fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
             println!("{}, {:?}", self.s, events);
         }
     }
@@ -1039,17 +1079,17 @@ mod tests {
         let up_counter = RwLock::new(0);
         let t = PressReleaseMacro::new(
             0xF0000u32,
-            Option::Some(|output: &mut KeyOutCatcher| {
+            |output: &mut KeyOutCatcher| {
                 //todo: why do we need to define the type here?
                 output.send_keys(&[KeyCode::H]);
                 let mut dc = down_counter.write();
                 *dc += 1;
-            }),
-            Option::Some(|output: &mut KeyOutCatcher| {
+            },
+            |output: &mut KeyOutCatcher| {
                 let mut dc = up_counter.write();
                 *dc += 1;
                 output.send_keys(&[KeyCode::I]);
-            }),
+            },
         );
 
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -1082,7 +1122,7 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.enable_handler(layer_id);
+        keyboard.output.state().enable_handler(layer_id);
         keyboard.add_keypress(KeyCode::B, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::B, 0);
@@ -1117,7 +1157,7 @@ mod tests {
         );
 
         keyboard.output.clear();
-        keyboard.disable_handler(layer_id);
+        keyboard.output.state().disable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
@@ -1125,7 +1165,7 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
 
         keyboard.output.clear();
-        keyboard.enable_handler(layer_id);
+        keyboard.output.state().enable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
@@ -1147,7 +1187,7 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.enable_handler(layer_id);
+        keyboard.output.state().enable_handler(layer_id);
         assert!(!keyboard.output.state().shift);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
@@ -1815,12 +1855,12 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let prm = PressReleaseMacro::new(
             KeyCode::A,
-            Some(|output: &mut KeyOutCatcher| {
+            |output: &mut KeyOutCatcher| {
                 output.send_keys(&[KeyCode::B]);
-            }),
-            Some(|output: &mut KeyOutCatcher| {
+            },
+            |output: &mut KeyOutCatcher| {
                 output.send_keys(&[KeyCode::C]);
-            }),
+            },
         );
         let no = keyboard.add_handler(Box::new(prm));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1833,7 +1873,7 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::B], &[], &[KeyCode::C], &[]]);
 
         keyboard.output.clear();
-        keyboard.disable_handler(no);
+        keyboard.output.state().disable_handler(no);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A]]);
@@ -1911,8 +1951,8 @@ mod tests {
             (KeyCode::B, RewriteTo(KeyCode::C.to_u32())),
         ]);
         let layer_id = keyboard.add_handler(Box::new(l));
-        assert!(!keyboard.is_handler_enabled(layer_id));
-        keyboard.enable_handler(layer_id);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.output.state().enable_handler(layer_id);
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(KeyCode::A, 0);
@@ -1937,7 +1977,7 @@ mod tests {
             (KeyCode::I, RewriteTo(KeyCode::C.to_u32())),
             (KeyCode::O, RewriteTo(KeyCode::R.to_u32())),
             (KeyCode::P, RewriteTo(KeyCode::L.to_u32())),
-            (KeyCode::Bslash, RewriteTo(KeyCode::Equal.to_u32())),
+            (KeyCode::BSlash, RewriteTo(KeyCode::Equal.to_u32())),
             //(KeyCode::A, RewriteTo(KeyCode::O.to_u32())),
             (KeyCode::S, RewriteTo(KeyCode::O.to_u32())),
             (KeyCode::D, RewriteTo(KeyCode::E.to_u32())),
@@ -1962,8 +2002,8 @@ mod tests {
         ]);
         keyboard.add_handler(Box::new(Debugger::new("A".to_string())));
         let layer_id = keyboard.add_handler(Box::new(l));
-        assert!(!keyboard.is_handler_enabled(layer_id));
-        keyboard.enable_handler(layer_id);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.output.state().enable_handler(layer_id);
         keyboard.add_handler(Box::new(Debugger::new("B".to_string())));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
