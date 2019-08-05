@@ -25,8 +25,8 @@ extern crate alloc;
 extern crate no_std_compat;
 
 pub use crate::handlers::ProcessKeys;
-pub use crate::key_codes::KeyCode;
-use crate::key_codes::{AcceptsKeycode, UNICODE_BELOW_256};
+use crate::key_codes::UNICODE_BELOW_256;
+pub use crate::key_codes::{AcceptsKeycode, KeyCode};
 use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
@@ -85,8 +85,8 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     ///
     /// by default, most handlers start in the enabled state.
     pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + Send + 'a>) -> HandlerID {
+        self.enabled.push(handler.default_enabled());
         self.handlers.push(handler);
-        self.enabled.push(true);
         return self.handlers.len() - 1;
     }
 
@@ -96,6 +96,10 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
 
     pub fn disable_handler(&mut self, no: HandlerID) {
         self.enabled[no] = false;
+    }
+
+    pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
+        self.enabled[no]
     }
 
     /// handle an update to the event stream
@@ -295,3 +299,6 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
 #[cfg(test)]
 #[macro_use]
 extern crate std;
+
+#[cfg(test)]
+extern crate parking_lot;

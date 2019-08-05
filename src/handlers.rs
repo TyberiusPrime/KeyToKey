@@ -115,7 +115,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                             }
                             Err(_) => *status = EventStatus::Handled, //throw it away, will ya?
                         };
-                        kc.flag = 1;
+                        kc.flag |= 1;
                     }
                 }
                 Event::TimeOut(_) => {}
@@ -315,18 +315,27 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                         if *from == kc.keycode {
                             match to {
                                 LayerAction::RewriteTo(to_keycode) => {
-                                    kc.keycode = *to_keycode;
+                                    if (kc.flag & 2) == 0 {
+                                        kc.keycode = *to_keycode;
+                                        kc.flag |= 2;
+                                    }
+                                    break; //only one rewrite per layer
                                 }
                                 LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
-                                    if output.state().shift {
-                                        kc.keycode = *to_shifted_keycode;
-                                    } else {
-                                        kc.keycode = *to_keycode;
+                                    if (kc.flag & 2) == 0 {
+                                        if output.state().shift {
+                                            kc.keycode = *to_shifted_keycode;
+                                        } else {
+                                            kc.keycode = *to_keycode;
+                                        }
+                                        kc.flag |= 2;
                                     }
+                                    break; //only one rewrite per layer
                                 }
                                 LayerAction::SendString(s) => {
                                     output.send_string(s);
                                     *status = EventStatus::Handled;
+                                    break; //only one rewrite per layer
                                 }
                             }
                         }
@@ -337,16 +346,27 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                         if *from == kc.keycode {
                             match to {
                                 LayerAction::RewriteTo(to_keycode) => {
-                                    kc.keycode = *to_keycode;
+                                    if (kc.flag & 2) == 0 {
+                                        kc.keycode = *to_keycode;
+                                        kc.flag |= 2;
+                                    }
+                                    break; //only one rewrite per layer
                                 }
                                 LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
-                                    if output.state().shift {
-                                        kc.keycode = *to_shifted_keycode;
-                                    } else {
-                                        kc.keycode = *to_keycode;
+                                    if (kc.flag & 2) == 0 {
+                                        if output.state().shift {
+                                            kc.keycode = *to_shifted_keycode;
+                                        } else {
+                                            kc.keycode = *to_keycode;
+                                        }
+                                        kc.flag |= 2;
                                     }
+                                    break; //only one rewrite per layer
                                 }
-                                LayerAction::SendString(_) => *status = EventStatus::Handled,
+                                LayerAction::SendString(_) => {
+                                    *status = EventStatus::Handled;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -773,12 +793,29 @@ mod tests {
         StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
     };
     #[allow(unused_imports)]
-    use crate::{Keyboard, KeyboardState, USBKeyOut, UnicodeSendMode};
+    use crate::{
+        Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
+    };
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
-    use parking_lot::RwLock;
+    use parking_lot::RwLock; //todo: figure out how to do this embeded
 
+    pub struct Debugger {
+        s: String,
+    }
+
+    impl Debugger {
+        fn new(s: String) -> Debugger {
+            Debugger { s }
+        }
+    }
+
+    impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
+        fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+            println!("{}, {:?}", self.s, events);
+        }
+    }
     #[test]
     fn test_usbkeyboard_single_key() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -1803,5 +1840,139 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::A, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
+    }
+
+    #[test]
+    fn test_unshift() {
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+
+        check_output(
+            &keyboard,
+            &[&[KeyCode::LShift], &[KeyCode::LShift, KeyCode::A]],
+        );
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[
+                &[KeyCode::LShift],
+                &[KeyCode::LShift, KeyCode::A],
+                &[KeyCode::LShift],
+            ],
+        );
+        keyboard.add_keyrelease(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(*&keyboard.output.state().shift == false);
+        check_output(
+            &keyboard,
+            &[
+                &[KeyCode::LShift],
+                &[KeyCode::LShift, KeyCode::A],
+                &[KeyCode::LShift],
+                &[],
+            ],
+        );
+        &keyboard.output.clear();
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::A]]);
+    }
+    #[test]
+    fn test_unshift2() {
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        keyboard.add_keyrelease(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift], &[]]);
+
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift], &[], &[KeyCode::A]]);
+    }
+
+    #[test]
+    fn test_layer_double_rewrite() {
+        use crate::handlers::LayerAction::RewriteTo;
+        use crate::AcceptsKeycode;
+
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let l = Layer::new(vec![
+            (KeyCode::A, RewriteTo(KeyCode::B.to_u32())),
+            (KeyCode::B, RewriteTo(KeyCode::C.to_u32())),
+        ]);
+        let layer_id = keyboard.add_handler(Box::new(l));
+        assert!(!keyboard.is_handler_enabled(layer_id));
+        keyboard.enable_handler(layer_id);
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::B]]);
+    }
+
+    #[test]
+    fn test_layer_double_rewrite_dvorak() {
+        //todo refactor with dvorak
+        use crate::handlers::LayerAction::RewriteTo;
+        use crate::AcceptsKeycode;
+
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let l = Layer::new(vec![
+            (KeyCode::Q, RewriteTo(KeyCode::Quote.to_u32())),
+            (KeyCode::W, RewriteTo(KeyCode::Comma.to_u32())),
+            (KeyCode::R, RewriteTo(KeyCode::Dot.to_u32())),
+            (KeyCode::T, RewriteTo(KeyCode::Y.to_u32())),
+            (KeyCode::Y, RewriteTo(KeyCode::F.to_u32())),
+            (KeyCode::U, RewriteTo(KeyCode::G.to_u32())),
+            (KeyCode::I, RewriteTo(KeyCode::C.to_u32())),
+            (KeyCode::O, RewriteTo(KeyCode::R.to_u32())),
+            (KeyCode::P, RewriteTo(KeyCode::L.to_u32())),
+            (KeyCode::Bslash, RewriteTo(KeyCode::Equal.to_u32())),
+            //(KeyCode::A, RewriteTo(KeyCode::O.to_u32())),
+            (KeyCode::S, RewriteTo(KeyCode::O.to_u32())),
+            (KeyCode::D, RewriteTo(KeyCode::E.to_u32())),
+            (KeyCode::F, RewriteTo(KeyCode::U.to_u32())),
+            (KeyCode::G, RewriteTo(KeyCode::I.to_u32())),
+            (KeyCode::H, RewriteTo(KeyCode::D.to_u32())),
+            (KeyCode::J, RewriteTo(KeyCode::H.to_u32())),
+            (KeyCode::K, RewriteTo(KeyCode::T.to_u32())),
+            (KeyCode::L, RewriteTo(KeyCode::N.to_u32())),
+            (KeyCode::SColon, RewriteTo(KeyCode::S.to_u32())),
+            (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
+            (KeyCode::Z, RewriteTo(KeyCode::SColon.to_u32())),
+            (KeyCode::X, RewriteTo(KeyCode::Q.to_u32())),
+            (KeyCode::C, RewriteTo(KeyCode::J.to_u32())),
+            (KeyCode::V, RewriteTo(KeyCode::K.to_u32())),
+            (KeyCode::B, RewriteTo(KeyCode::X.to_u32())),
+            //(KeyCode::N, RewriteTo(KeyCode::N.to_u32())),
+            (KeyCode::M, RewriteTo(KeyCode::M.to_u32())),
+            (KeyCode::Comma, RewriteTo(KeyCode::W.to_u32())),
+            (KeyCode::Dot, RewriteTo(KeyCode::V.to_u32())),
+            (KeyCode::Slash, RewriteTo(KeyCode::Z.to_u32())),
+        ]);
+        keyboard.add_handler(Box::new(Debugger::new("A".to_string())));
+        let layer_id = keyboard.add_handler(Box::new(l));
+        assert!(!keyboard.is_handler_enabled(layer_id));
+        keyboard.enable_handler(layer_id);
+        keyboard.add_handler(Box::new(Debugger::new("B".to_string())));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::Q, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::Quote]]);
+        keyboard.add_keyrelease(KeyCode::Q, 0);
+        keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::Quote], &[]]);
     }
 }

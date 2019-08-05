@@ -11,10 +11,11 @@ heapless = "0.4.4"
 num_enum = "0.3.1"
 #num_enum = {path = "../num_enum"}
 no-std-compat = {version="0.1.0", features=["alloc", ]}
-parking_lot = "0.9.0"
 
 [dependencies.smallbitvec]
 version = "2.4.0"
 path = "../smallbitvec"
 default-features = false
 
+[dev-dependencies]
+parking_lot = "0.9.0"

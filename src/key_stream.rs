@@ -5,7 +5,10 @@ pub struct Key {
     pub keycode: u32,
     pub ms_since_last: u16,
     pub running_number: u8,
-    pub flag: u8,
+    pub flag: u8, //Todo: express this better
+                  //bit 0 is used by Usbkeyboard to decide whether a KeyPress has ever been sent
+                  //(or kept back by a different handler so far)
+                  //bit1 is used to protect against double rewrites
 }
 
 impl Key {

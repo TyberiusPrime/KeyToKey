@@ -56,16 +56,15 @@ impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
             *status = EventStatus::Handled;
             match e {
                 Event::KeyRelease(kc) => {
-                    output.send_string(".into()");
+                    output.send_string(".into(),");
                     output.send_keys(&[KeyCode::Enter]);
                     output.send_empty();
                     let codes = transform_u32_to_keycodes(kc.keycode);
                     for c in &codes {
                         output.send_keys(&[*c]);
+                        output.send_empty();
                     }
-                    /*
                     output.send_string("\tKeyCode::");
-                    */
                     *status = EventStatus::Handled;
                 }
                 _ => {
