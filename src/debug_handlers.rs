@@ -33,14 +33,14 @@ fn nibble_to_keycode(nibble: u8) -> KeyCode {
 }
 fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
     return [
-        nibble_to_keycode(((x >> 32 - 4) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 8) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 12) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 16) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 20) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 24) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 28) & 0xff) as u8),
-        nibble_to_keycode(((x >> 32 - 32) & 0xff) as u8),
+        nibble_to_keycode(((x >> 32 - 4) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 8) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 12) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 16) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 20) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 24) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 28) & 0xf) as u8),
+        nibble_to_keycode(((x >> 32 - 32) & 0xf) as u8),
     ];
 }
 
@@ -127,9 +127,74 @@ mod tests {
     use crate::debug_handlers::transform_u32_to_keycodes;
     use crate::key_codes::KeyCode;
     #[test]
-    fn test_transform_u32_to_keycodes(){
+    fn test_transform_u32_to_keycodes() {
         assert!(transform_u32_to_keycodes(0) == [KeyCode::Kb0; 8]);
+        assert!(
+            transform_u32_to_keycodes(1)
+                == [
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb1,
+                ]
+        );
+        assert!(
+            transform_u32_to_keycodes(10)
+                == [
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::A,
+                ]
+        );
+        assert!(
+            transform_u32_to_keycodes(16)
+                == [
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb1,
+                    KeyCode::Kb0,
+                ]
+        );
+        assert!(
+            transform_u32_to_keycodes(255)
+                == [
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::F,
+                    KeyCode::F,
+                ]
+        );
+        dbg!(transform_u32_to_keycodes(255));
 
+        assert!(
+            transform_u32_to_keycodes(256 + 0xA2)
+                == [
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb0,
+                    KeyCode::Kb1,
+                    KeyCode::A,
+                    KeyCode::Kb2,
+                ]
+        );
     }
-    }
- 
+}

@@ -24,11 +24,11 @@ mod test_helpers;
 extern crate alloc;
 extern crate no_std_compat;
 
-pub use crate::handlers::{ProcessKeys};
-use crate::key_codes::{AcceptsKeycode, UNICODE_BELOW_256};
+pub use crate::handlers::ProcessKeys;
 pub use crate::key_codes::KeyCode;
-pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::key_codes::{AcceptsKeycode, UNICODE_BELOW_256};
 use crate::key_stream::Key;
+pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 
@@ -252,9 +252,7 @@ pub trait USBKeyOut {
             UnicodeSendMode::Debug => {
                 let mut buf = [0, 0, 0, 0];
                 c.encode_utf8(&mut buf);
-                self.send_keys(&[(
-                    (buf[0] as u32) + UNICODE_BELOW_256)
-                    .try_into().unwrap()]);
+                self.send_keys(&[((buf[0] as u32) + UNICODE_BELOW_256).try_into().unwrap()]);
             }
         }
     }
@@ -274,7 +272,7 @@ pub trait USBKeyOut {
             */
             //probably best to unicode everything
             self.send_unicode(c);
- 
+
             // option: send simple ones directly?
             /*
             if 'a' <= c && c <= 'z' {
@@ -283,17 +281,15 @@ pub trait USBKeyOut {
         }
     }
 }
-    fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCode
-    {
-        let mut ascii = [0 as u8]; // buffer
-        c.encode_utf8(&mut ascii);
-        let keycode: u32 = keycode_offset.to_u32();
-        let keycode = keycode as u8;
-        let keycode = keycode + (ascii[0] - ascii_offset);
-        let keycode: KeyCode = keycode.try_into().unwrap();
-        keycode
-    }
-
+fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCode {
+    let mut ascii = [0 as u8]; // buffer
+    c.encode_utf8(&mut ascii);
+    let keycode: u32 = keycode_offset.to_u32();
+    let keycode = keycode as u8;
+    let keycode = keycode + (ascii[0] - ascii_offset);
+    let keycode: KeyCode = keycode.try_into().unwrap();
+    keycode
+}
 
 //so the tests 'just work'.
 #[cfg(test)]

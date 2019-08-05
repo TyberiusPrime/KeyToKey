@@ -34,8 +34,8 @@ impl USBKeyboard {
     }
 }
 
-fn is_usb_keycode(kc: u32) -> bool{
-    return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256  + 0xE7; //RGui
+fn is_usb_keycode(kc: u32) -> bool {
+    return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
@@ -869,7 +869,10 @@ mod tests {
         keyboard.add_keyrelease(0x03B4, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
-        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[]]);
+        check_output(
+            &keyboard,
+            &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[]],
+        );
         assert!(keyboard.events.is_empty()); // we eat the keypress though
     }
 
@@ -892,7 +895,10 @@ mod tests {
         keyboard.add_keyrelease(0x3B4, 0);
         keyboard.output.clear();
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4],&[Enter],  &[], &[A]]);
+        check_output(
+            &keyboard,
+            &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[], &[A]],
+        );
         keyboard.add_keyrelease(A, 0);
         keyboard.output.clear();
         keyboard.handle_keys().unwrap();
@@ -947,8 +953,8 @@ mod tests {
         //second press - unsets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read()== 1);
-        assert!(*up_counter.read()== 1);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 1);
         assert!(keyboard.events.is_empty());
 
         //second release - no change
@@ -1798,5 +1804,4 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
     }
-
 }

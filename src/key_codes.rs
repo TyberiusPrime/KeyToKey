@@ -4,7 +4,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 pub const UNICODE_BELOW_256: u32 = 0x100000;
 
-
 /// usb key codes mapped into the first private region of unicode
 /// USBKeyOut must substract UNICODE_BELOW_256 to create valid u8 values
 /// to transmit
@@ -133,14 +132,13 @@ impl KeyCode {
     /// needed to build USB reports
     pub fn as_modifier_bit(self) -> u8 {
         if self.is_modifier() {
-            1 << (self.to_u8()- KeyCode::LCtrl.to_u8())
+            1 << (self.to_u8() - KeyCode::LCtrl.to_u8())
         } else {
             0
         }
     }
 
-    pub fn to_u8(self) -> u8
-    {
+    pub fn to_u8(self) -> u8 {
         let u = (self as u32) - UNICODE_BELOW_256;
         return u as u8;
     }
@@ -149,7 +147,7 @@ impl KeyCode {
 impl TryFrom<u8> for KeyCode {
     type Error = String;
     fn try_from(ii: u8) -> Result<KeyCode, Self::Error> {
-        let x: u32 = (ii as u32)+ UNICODE_BELOW_256;
+        let x: u32 = (ii as u32) + UNICODE_BELOW_256;
         return x.try_into();
     }
 }
