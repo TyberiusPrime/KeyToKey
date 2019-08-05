@@ -58,11 +58,15 @@ impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
                 Event::KeyRelease(kc) => {
                     output.send_string(".into()");
                     output.send_keys(&[KeyCode::Enter]);
+                    output.send_empty();
                     let codes = transform_u32_to_keycodes(kc.keycode);
                     for c in &codes {
                         output.send_keys(&[*c]);
                     }
+                    /*
                     output.send_string("\tKeyCode::");
+                    */
+                    *status = EventStatus::Handled;
                 }
                 _ => {
                     *status = EventStatus::Handled;
@@ -115,3 +119,17 @@ impl<T: USBKeyOut, F: FnMut(String)> ProcessKeys<T> for DebugStream<F> {
         }
     }
 }
+
+#[cfg(test)]
+//#[macro_use]
+//extern crate std;
+mod tests {
+    use crate::debug_handlers::transform_u32_to_keycodes;
+    use crate::key_codes::KeyCode;
+    #[test]
+    fn test_transform_u32_to_keycodes(){
+        assert!(transform_u32_to_keycodes(0) == [KeyCode::Kb0; 8]);
+
+    }
+    }
+ 

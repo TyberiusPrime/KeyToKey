@@ -777,10 +777,7 @@ mod tests {
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
-    #[allow(unused_imports)]
-    use no_std_compat::cell::RefCell;
-    #[allow(unused_imports)]
-    use no_std_compat::rc::Rc;
+    use parking_lot::RwLock;
 
     #[test]
     fn test_usbkeyboard_single_key() {
@@ -871,7 +868,8 @@ mod tests {
 
         keyboard.add_keyrelease(0x03B4, 0);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[]]);
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[]]);
         assert!(keyboard.events.is_empty()); // we eat the keypress though
     }
 
@@ -894,7 +892,7 @@ mod tests {
         keyboard.add_keyrelease(0x3B4, 0);
         keyboard.output.clear();
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[], &[A]]);
+        check_output(&keyboard, &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4],&[Enter],  &[], &[A]]);
         keyboard.add_keyrelease(A, 0);
         keyboard.output.clear();
         keyboard.handle_keys().unwrap();
@@ -912,17 +910,17 @@ mod tests {
 
     #[test]
     fn test_toggle_macro() {
-        let down_counter = RefCell::new(0);
-        let up_counter = RefCell::new(0);
+        let down_counter = RwLock::new(0);
+        let up_counter = RwLock::new(0);
         let t = OneShot::new(
             0xF0000u32,
             |output: &mut KeyOutCatcher| {
                 output.send_keys(&[KeyCode::H]);
-                let mut dc = down_counter.borrow_mut();
+                let mut dc = down_counter.write();
                 *dc += 1;
             },
             |_output| {
-                let mut dc = up_counter.borrow_mut();
+                let mut dc = up_counter.write();
                 *dc += 1;
             },
         );
@@ -933,8 +931,8 @@ mod tests {
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 0);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 0);
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
@@ -942,70 +940,70 @@ mod tests {
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 0);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 0);
         assert!(keyboard.events.is_empty());
 
         //second press - unsets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read()== 1);
+        assert!(*up_counter.read()== 1);
         assert!(keyboard.events.is_empty());
 
         //second release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 1);
         assert!(keyboard.events.is_empty());
 
         //third press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 2);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read() == 2);
+        assert!(*up_counter.read() == 1);
         assert!(keyboard.events.is_empty());
 
         keyboard.add_keypress(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 2);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read() == 2);
+        assert!(*up_counter.read() == 1);
 
         keyboard.add_keyrelease(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 2);
-        assert!(*up_counter.borrow() == 2);
+        assert!(*down_counter.read() == 2);
+        assert!(*up_counter.read() == 2);
 
         //third release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 2);
-        assert!(*up_counter.borrow() == 2);
+        assert!(*down_counter.read() == 2);
+        assert!(*up_counter.read() == 2);
         assert!(keyboard.events.is_empty());
 
         //fourth press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 3);
-        assert!(*up_counter.borrow() == 2);
+        assert!(*down_counter.read() == 3);
+        assert!(*up_counter.read() == 2);
         assert!(keyboard.events.is_empty());
     }
 
     #[test]
     fn test_press_release() {
-        let down_counter = RefCell::new(0);
-        let up_counter = RefCell::new(0);
+        let down_counter = RwLock::new(0);
+        let up_counter = RwLock::new(0);
         let t = PressReleaseMacro::new(
             0xF0000u32,
             Option::Some(|output: &mut KeyOutCatcher| {
                 //todo: why do we need to define the type here?
                 output.send_keys(&[KeyCode::H]);
-                let mut dc = down_counter.borrow_mut();
+                let mut dc = down_counter.write();
                 *dc += 1;
             }),
             Option::Some(|output: &mut KeyOutCatcher| {
-                let mut dc = up_counter.borrow_mut();
+                let mut dc = up_counter.write();
                 *dc += 1;
                 output.send_keys(&[KeyCode::I]);
             }),
@@ -1017,8 +1015,8 @@ mod tests {
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 0);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 0);
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
@@ -1026,8 +1024,8 @@ mod tests {
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 1);
         check_output(&keyboard, &[&[KeyCode::I], &[]]);
         keyboard.output.clear();
     }
@@ -1347,6 +1345,8 @@ mod tests {
         keyboard.add_keypress(KeyCode::C, 0);
         keyboard.add_keyrelease(KeyCode::C, 0);
         keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+
         check_output(&keyboard, &[&[65u8.try_into().unwrap()], &[]]);
         keyboard.output.clear();
 
@@ -1377,19 +1377,19 @@ mod tests {
 
     #[test]
     fn test_spacecadet() {
-        let down_counter = RefCell::new(0);
-        let up_counter = RefCell::new(0);
+        let down_counter = RwLock::new(0);
+        let up_counter = RwLock::new(0);
         let l = SpaceCadet::new(
             KeyCode::X,
             |output: &mut KeyOutCatcher| {
                 println!("activate");
-                let mut c = down_counter.borrow_mut();
+                let mut c = down_counter.write();
                 *c += 1;
                 output.send_keys(&[KeyCode::A])
             },
             |output: &mut KeyOutCatcher| {
                 println!("deactivate");
-                let mut c = up_counter.borrow_mut();
+                let mut c = up_counter.write();
                 *c += 1;
                 output.send_keys(&[KeyCode::B])
             },
@@ -1423,8 +1423,8 @@ mod tests {
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::A], &[KeyCode::Z]]);
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 0);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 0);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::Z, 0);
@@ -1434,8 +1434,8 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B], &[]]);
-        assert!(*down_counter.borrow() == 1);
-        assert!(*up_counter.borrow() == 1);
+        assert!(*down_counter.read() == 1);
+        assert!(*up_counter.read() == 1);
         keyboard.output.clear();
     }
 

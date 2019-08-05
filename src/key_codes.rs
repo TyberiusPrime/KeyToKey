@@ -2,14 +2,12 @@ use alloc::{format, string::String};
 use core::convert::{TryFrom, TryInto};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-// here because the external users will need it.
-/// If you want to send a Unicode below id=256
-/// you'll need to add this value, otherwise
-/// you'll be sending standard USB keycodes instead.
 pub const UNICODE_BELOW_256: u32 = 0x100000;
 
 
 /// usb key codes mapped into the first private region of unicode
+/// USBKeyOut must substract UNICODE_BELOW_256 to create valid u8 values
+/// to transmit
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive, Debug)]
 #[repr(u32)]
 pub enum KeyCode {
@@ -127,9 +125,12 @@ pub enum KeyCode {
     RGui, // 0xE7
 }
 impl KeyCode {
+    /// needed to build USB reports
     pub fn is_modifier(self) -> bool {
         KeyCode::LCtrl <= self && self <= KeyCode::RGui
     }
+
+    /// needed to build USB reports
     pub fn as_modifier_bit(self) -> u8 {
         if self.is_modifier() {
             1 << (self.to_u8()- KeyCode::LCtrl.to_u8())

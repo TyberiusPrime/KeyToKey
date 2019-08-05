@@ -14,8 +14,8 @@
 #![feature(drain_filter)]
 #![no_std]
 
-mod debug_handlers;
-mod handlers;
+pub mod debug_handlers;
+pub mod handlers;
 mod key_codes;
 mod key_stream;
 mod matrix;
@@ -24,24 +24,26 @@ mod test_helpers;
 extern crate alloc;
 extern crate no_std_compat;
 
-pub use crate::handlers::*;
-use crate::key_codes::{AcceptsKeycode, KeyCode, UNICODE_BELOW_256};
-use crate::key_stream::{iter_unhandled_mut, Event, EventStatus, Key};
+pub use crate::handlers::{ProcessKeys};
+use crate::key_codes::{AcceptsKeycode, UNICODE_BELOW_256};
+pub use crate::key_codes::KeyCode;
+pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::key_stream::Key;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 
 /// current keyboard state.
 #[derive(Debug)]
 pub struct KeyboardState {
-    shift: bool,
-    ctrl: bool,
-    alt: bool,
-    meta: bool,
-    unicode_mode: UnicodeSendMode,
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub meta: bool,
+    pub unicode_mode: UnicodeSendMode,
 }
 
 impl KeyboardState {
-    fn new() -> KeyboardState {
+    pub fn new() -> KeyboardState {
         KeyboardState {
             shift: false,
             ctrl: false,
@@ -60,15 +62,15 @@ impl KeyboardState {
 pub struct Keyboard<'a, T: USBKeyOut> {
     events: Vec<(Event, EventStatus)>,
     running_number: u8,
-    handlers: Vec<Box<dyn ProcessKeys<T> + 'a>>,
+    handlers: Vec<Box<dyn ProcessKeys<T> + Send + 'a>>,
     enabled: Vec<bool>,
-    output: T,
+    pub output: T,
 }
 
 type HandlerID = usize;
 
 impl<'a, T: USBKeyOut> Keyboard<'a, T> {
-    fn new(output: T) -> Keyboard<'a, T> {
+    pub fn new(output: T) -> Keyboard<'a, T> {
         Keyboard {
             events: Vec::new(),
             running_number: 0,
@@ -82,7 +84,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     /// which you may use for enable_handler/disable_handler
     ///
     /// by default, most handlers start in the enabled state.
-    pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + 'a>) -> HandlerID {
+    pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + Send + 'a>) -> HandlerID {
         self.handlers.push(handler);
         self.enabled.push(true);
         return self.handlers.len() - 1;
@@ -102,7 +104,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     /// and an Err(()) otherwise.
     /// that way the down stream can decide what to do
     /// (tests: panic. Firmare/MatrixToStream -> drop unhandled events)
-    fn handle_keys(&mut self) -> Result<(), ()> {
+    pub fn handle_keys(&mut self) -> Result<(), ()> {
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
@@ -130,7 +132,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     }
 
     //throw away unhandled key events
-    fn clear_unhandled(&mut self) {
+    pub fn clear_unhandled(&mut self) {
         self.events
             .drain_filter(|(_event, status)| (EventStatus::Unhandled == *status));
     }
@@ -244,6 +246,7 @@ pub trait USBKeyOut {
                 for out_c in escaped.skip(3).take_while(|x| *x != '}') {
                     self.send_keys(&[hex_digit_to_keycode(out_c)]);
                 }
+                self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
             }
             UnicodeSendMode::Debug => {
@@ -260,22 +263,37 @@ pub trait USBKeyOut {
     /// all characters are converted into unicode input!
     fn send_string(&mut self, s: &str) {
         for c in s.chars() {
+            /* the problem with this approach: it is dependant on the shift/caps lock state
+            match c {
+                'a'..='z' => {self.send_keys(&[ascii_to_keycode(c, 97, KeyCode::A)]); self.send_empty()},
+                '1'..='9' => {self.send_keys(&[ascii_to_keycode(c, 49, KeyCode::Kb1)]); self.send_empty()},
+                '0' => {self.send_keys(&[KeyCode::Kb0]); self.send_empty()},
+                'A'..='Z' => {self.send_keys(&[ascii_to_keycode(c, 65, KeyCode::A), KeyCode::LShift]); self.send_empty()},
+                _ => self.send_unicode(c),
+            }
+            */
+            //probably best to unicode everything
             self.send_unicode(c);
+ 
             // option: send simple ones directly?
             /*
             if 'a' <= c && c <= 'z' {
-                let mut ascii = [0 as u8];
-                c.encode_utf8(&mut ascii);
-                let keycode: u8 = KeyCode::A.into();
-                let keycode = keycode + (ascii[0] - 97);
-                let keycode: KeyCode = keycode.try_into().unwrap();
-                self.send_keys(&[keycode]);
-                self.send_keys(&[]); // send release
-            }
+                            }
             */
         }
     }
 }
+    fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCode
+    {
+        let mut ascii = [0 as u8]; // buffer
+        c.encode_utf8(&mut ascii);
+        let keycode: u32 = keycode_offset.to_u32();
+        let keycode = keycode as u8;
+        let keycode = keycode + (ascii[0] - ascii_offset);
+        let keycode: KeyCode = keycode.try_into().unwrap();
+        keycode
+    }
+
 
 //so the tests 'just work'.
 #[cfg(test)]
