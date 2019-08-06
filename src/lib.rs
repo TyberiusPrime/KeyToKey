@@ -1,5 +1,8 @@
 //todo:
-// shift remaps on layers (ie. disassociate the premade shift-combos)
+// shift remaps on layers (ie. disassociate the premade shift-combos) testing
+// oneshot deactivate if released after x seconds 
+// leader does not work
+// space cadet does not work
 // combos
 // tapdance enhancemeants, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
@@ -276,6 +279,7 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
     let keycode: KeyCode = keycode.try_into().unwrap();
     keycode
 }
+
 //so the tests 'just work'.
 #[cfg(test)]
 #[macro_use]

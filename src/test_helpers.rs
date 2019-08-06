@@ -1,8 +1,8 @@
-use no_std_compat::prelude::v1::*;
 use crate::key_codes::KeyCode;
 use crate::{
     iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
 };
+use no_std_compat::prelude::v1::*;
 pub struct KeyOutCatcher {
     keys_registered: Vec<u8>,
     pub reports: Vec<Vec<u8>>,

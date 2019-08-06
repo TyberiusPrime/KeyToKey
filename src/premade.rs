@@ -1,6 +1,7 @@
 /// premade handlers for various occacions
 use crate::handlers::{Layer, MacroCallback, OneShot, PressReleaseMacro, SpaceCadet};
-use crate::{AcceptsKeycode, HandlerID, KeyCode, USBKeyOut};
+use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::{AcceptsKeycode, HandlerID, KeyCode, USBKeyOut, ProcessKeys, };
 use no_std_compat::prelude::v1::*;
 ///toggle a handler on activate
 /// do noting on deactivate
@@ -166,20 +167,67 @@ pub fn space_cadet_handler(
 ) -> Box<SpaceCadet<ActionHandler>> {
     Box::new(SpaceCadet::new(trigger, ActionHandler { id }))
 }
+
+
+/// Handler for turing Copy/Paste/Cut Keycodes into 'universal' 
+/// Ctrl-Insert, Shift-insert, shift-delete keystrokes 
+/// for dedicated copy paste keys
+pub struct CopyPaste  {}
+
+impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        //step 0: on key release, remove all prior key presses.
+       for (e, status) in iter_unhandled_mut(events) {
+           match e {
+               Event::KeyPress(kc)=> {
+                   if kc.keycode == KeyCode::Copy.into() {
+                       output.send_keys(&[KeyCode::LCtrl, KeyCode::Insert]);
+                       output.send_empty();
+                       *status = EventStatus::Handled;
+                   } if kc.keycode == KeyCode::Paste.into() {
+                       output.send_keys(&[KeyCode::LShift, KeyCode::Insert]);
+                       output.send_empty();
+                       *status = EventStatus::Handled;
+                   } if kc.keycode == KeyCode::Cut.into() {
+                       output.send_keys(&[KeyCode::LShift, KeyCode::Delete]);
+                       output.send_empty();
+                       *status = EventStatus::Handled;
+                   }
+               },
+               Event::KeyRelease(kc)  =>{
+                   if kc.keycode == KeyCode::Copy.into() {
+                       *status = EventStatus::Handled;
+                   } if kc.keycode == KeyCode::Paste.into() {
+                       *status = EventStatus::Handled;
+                   } if kc.keycode == KeyCode::Cut.into() {
+                       *status = EventStatus::Handled;
+                   }
+               }
+               _ => {}
+           }
+
+
+           }
+    }
+}
+    
+
+
+
 #[cfg(test)]
 mod tests {
+    use crate::handlers::USBKeyboard;
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
-    use crate::test_helpers::{check_output, KeyOutCatcher};
-    use no_std_compat::prelude::v1::*;
-    use crate::handlers::USBKeyboard;
-    #[allow(unused_imports)]
     use crate::premade::{dvorak, toggle_handler};
+    #[allow(unused_imports)]
+    use crate::test_helpers::{check_output, KeyOutCatcher};
     #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
+    use no_std_compat::prelude::v1::*;
     #[test]
     fn test_toggle_handler() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());

@@ -111,6 +111,56 @@ pub enum KeyCode {
     NonUsBslash, // Non-US \ and | (Typically near the Left-Shift key)
     Application, // 0x65
 
+    Power, // 0x66,
+    KpEqual ,// 0x67, // Keypad =
+
+    F13, // 0x68 Keyboard F13
+    F14, // 0x69, // Keyboard F14
+    F15, // 0x6a, // Keyboard F15
+    F16, // 0x6b, // Keyboard F16
+    F17, // 0x6c, // Keyboard F17
+    F18, // 0x6d, // Keyboard F18
+    F19, // 0x6e, // Keyboard F19
+    F20, // 0x6f, // Keyboard F20
+    F21, // 0x70, // Keyboard F21
+    F22, // 0x71, // Keyboard F22
+    F23, // 0x72, // Keyboard F23
+    F24, // 0x73, // Keyboard F24
+
+    Open, // 0x74,       // Keyboard Execute
+    Help, // 0x75,       // Keyboard Help
+    Props, /// 0x76,      // Keyboard Menu
+    Front, // 0x77,      // Keyboard Select
+    Stop, // 0x78,       // Keyboard Stop
+    Again, // 0x79,      // Keyboard Again
+    Undo, // 0x7a,       // Keyboard Undo
+    Cut, // 0x7b,        // Keyboard Cut
+    Copy, // 0x7c,       // Keyboard Copy
+    Paste, // 0x7d,      // Keyboard Paste
+    Find, // 0x7e,       // Keyboard Find
+    Mute, // 0x7f,       // Keyboard Mute
+    VolumeUp, // 0x80,   // Keyboard Volume Up
+    VolumeDown, // 0x81, // Keyboard Volume Down
+    // // 0x82  Keyboard Locking Caps Lock
+    // // 0x83  Keyboard Locking Num Lock
+    // // 0x84  Keyboard Locking Scroll Lock
+    Kpcomma, // 0x85, // Keypad Comma
+    // // 0x86  Keypad Equal Sign
+    Ro, // 0x87,               // Keyboard International1
+    Katakanahiragana, // 0x88, // Keyboard International2
+    Yen, // 0x89,              // Keyboard International3
+    Henkan, // 0x8a,           // Keyboard International4
+    Muhenkan, // 0x8b,         // Keyboard International5
+    KpJpComma, // 0x8c,        // Keyboard International6
+    // // 0x8d  Keyboard International7
+    // // 0x8e  Keyboard International8
+    // // 0x8f  Keyboard International9
+    Hangeul, // 0x90,        // Keyboard LANG1
+    Hanja, // 0x91,          // Keyboard LANG2
+    Katakana, // 0x92,       // Keyboard LANG3
+    Hiragana, // 0x93,       // Keyboard LANG // 0x674
+    Zenkakuhankaku, // 0x94, // Keyboard LANG5
+
     // Modifiers
     LCtrl = 0xE0 + UNICODE_BELOW_256,
     LShift,

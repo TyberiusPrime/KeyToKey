@@ -1,11 +1,11 @@
 use crate::key_codes::{AcceptsKeycode, KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::USBKeyOut;
 use core::convert::TryInto;
 use lazy_static::lazy_static;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
 use spin::RwLock;
-use crate::USBKeyOut;
 /// Handlers are defined by this trait
 ///
 /// they process the events, set their status to either Handled or Ignored
@@ -133,12 +133,10 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     }
 }
 /// This processor sends unicode 'characters'
-/// just map your keys to unicode 'characters' (if code > 256)
-/// for unicode codes < 256 use unicode code + UNICODE_BELOW_256
-/// (=0x100000).
+/// just map your keys to unicode 'characters'
 /// sending happens on keyrelease - no key repeat
 ///
-/// use the range 0xF0000..=0xFFFFD, or 0x1000FF..=0x10FFFD
+/// use the range 0xF0100..=0xFFFFD, or 0x1000FF..=0x10FFFD
 ///  for custom key codes that are note processed
 pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
@@ -783,21 +781,21 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
 //#[macro_use]
 //extern crate std;
 mod tests {
-    #[allow(unused_imports)]
-    use crate::key_codes::KeyCode;
-    #[allow(unused_imports)]
-    use crate::test_helpers::{check_output, KeyOutCatcher};
     use crate::handlers::{
         AutoShift, Layer, LayerAction, Leader, MacroCallback, MatchResult, OneShot,
         PressReleaseMacro, SpaceCadet, StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
     };
     #[allow(unused_imports)]
+    use crate::key_codes::KeyCode;
+    #[allow(unused_imports)]
+    use crate::test_helpers::{check_output, KeyOutCatcher};
+    #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
+    use alloc::sync::Arc;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    use alloc::sync::Arc;
     use spin::RwLock;
     pub struct Debugger {
         s: String,
@@ -1016,7 +1014,7 @@ mod tests {
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 1); //trigger is being held
-            //third release - release trigger after other
+                                                     //third release - release trigger after other
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
             dbg!(&counter);
@@ -1093,7 +1091,7 @@ mod tests {
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
         assert!(counter.read().up_counter == 1); // still being held
-        //third release - triggers deactivate
+                                                 //third release - triggers deactivate
         keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
