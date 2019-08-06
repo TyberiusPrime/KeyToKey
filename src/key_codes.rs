@@ -152,6 +152,8 @@ impl TryFrom<u8> for KeyCode {
     }
 }
 
+/// Trait for things that can be converted to a u32 keycode
+/// ie. various integers and (usb) KeyCodes themselves
 pub trait AcceptsKeycode {
     fn to_u32(&self) -> u32;
 }

@@ -18,9 +18,8 @@ pub mod debug_handlers;
 pub mod handlers;
 mod key_codes;
 mod key_stream;
-mod matrix;
 pub mod premade;
-mod test_helpers;
+pub mod test_helpers;
 
 extern crate alloc;
 extern crate no_std_compat;
@@ -76,7 +75,7 @@ impl KeyboardState {
 /// the main keyboard struct
 ///
 /// add handlers wit add_handler,
-/// then pass it to matrix.MatrixToStream.update()
+/// then call add_keypress/add_key_release/add_timeout
 /// to start processing keys.
 pub struct Keyboard<'a, T: USBKeyOut> {
     events: Vec<(Event, EventStatus)>,
@@ -98,9 +97,9 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     }
 
     /// add a handler, return a HandlerID
-    /// which you may use for enable_handler/disable_handler
+    /// which you may use with keyboard.output.state().enable_handler / disable_handler / toggle_handler / is_handler_enabled
     ///
-    /// by default, most handlers start in the enabled state.
+    /// by default, most handlers start in the enabled state (with the notable exception of Layers).
     pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + Send + 'a>) -> HandlerID {
         self.output
             .state()

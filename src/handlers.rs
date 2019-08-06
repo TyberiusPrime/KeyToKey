@@ -769,51 +769,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
     }
 }
 
-/// A layer that maps qwerty to dvorak.
-/// Don't forget to enable it, layers are off by default
-pub fn dvorak<'a>() -> Layer<'a> {
-    use LayerAction::RewriteTo;
-    Layer::new(vec![
-        (KeyCode::Q, RewriteTo(KeyCode::Quote.to_u32())),
-        (KeyCode::W, RewriteTo(KeyCode::Comma.to_u32())),
-        (KeyCode::E, RewriteTo(KeyCode::Dot.to_u32())),
-        (KeyCode::R, RewriteTo(KeyCode::P.to_u32())),
-        (KeyCode::T, RewriteTo(KeyCode::Y.to_u32())),
-        (KeyCode::Y, RewriteTo(KeyCode::F.to_u32())),
-        (KeyCode::U, RewriteTo(KeyCode::G.to_u32())),
-        (KeyCode::I, RewriteTo(KeyCode::C.to_u32())),
-        (KeyCode::O, RewriteTo(KeyCode::R.to_u32())),
-        (KeyCode::P, RewriteTo(KeyCode::L.to_u32())),
-        //(KeyCode::A, RewriteTo(KeyCode::A.to_u32())),
-        (KeyCode::S, RewriteTo(KeyCode::O.to_u32())),
-        (KeyCode::D, RewriteTo(KeyCode::E.to_u32())),
-        (KeyCode::F, RewriteTo(KeyCode::U.to_u32())),
-        (KeyCode::G, RewriteTo(KeyCode::I.to_u32())),
-        (KeyCode::H, RewriteTo(KeyCode::D.to_u32())),
-        (KeyCode::J, RewriteTo(KeyCode::H.to_u32())),
-        (KeyCode::K, RewriteTo(KeyCode::T.to_u32())),
-        (KeyCode::L, RewriteTo(KeyCode::N.to_u32())),
-        (KeyCode::SColon, RewriteTo(KeyCode::S.to_u32())),
-        (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
-        (KeyCode::Z, RewriteTo(KeyCode::SColon.to_u32())),
-        (KeyCode::X, RewriteTo(KeyCode::Q.to_u32())),
-        (KeyCode::C, RewriteTo(KeyCode::J.to_u32())),
-        (KeyCode::V, RewriteTo(KeyCode::K.to_u32())),
-        (KeyCode::B, RewriteTo(KeyCode::X.to_u32())),
-        (KeyCode::N, RewriteTo(KeyCode::B.to_u32())),
-        (KeyCode::M, RewriteTo(KeyCode::M.to_u32())),
-        (KeyCode::Comma, RewriteTo(KeyCode::W.to_u32())),
-        (KeyCode::Dot, RewriteTo(KeyCode::V.to_u32())),
-        (KeyCode::Slash, RewriteTo(KeyCode::Z.to_u32())),
-        //(KeyCode::BSlash, RewriteTo(KeyCode::Bslash.to_u32())),
-        (KeyCode::Equal, RewriteTo(KeyCode::LBracket.to_u32())),
-        (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
-        (KeyCode::RBracket, RewriteTo(KeyCode::Slash.to_u32())),
-        //(KeyCode::Grave, RewriteTo(KeyCode::Grave.to_u32())),
-        (KeyCode::Minus, RewriteTo(KeyCode::RBracket.to_u32())),
-        (KeyCode::LBracket, RewriteTo(KeyCode::Slash.to_u32())),
-    ])
-}
 
 #[cfg(test)]
 //#[macro_use]
@@ -1960,61 +1915,5 @@ mod tests {
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B]]);
-    }
-
-    #[test]
-    fn test_layer_double_rewrite_dvorak() {
-        //todo refactor with dvorak
-        use crate::handlers::LayerAction::RewriteTo;
-        use crate::AcceptsKeycode;
-
-        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let l = Layer::new(vec![
-            (KeyCode::Q, RewriteTo(KeyCode::Quote.to_u32())),
-            (KeyCode::W, RewriteTo(KeyCode::Comma.to_u32())),
-            (KeyCode::R, RewriteTo(KeyCode::Dot.to_u32())),
-            (KeyCode::T, RewriteTo(KeyCode::Y.to_u32())),
-            (KeyCode::Y, RewriteTo(KeyCode::F.to_u32())),
-            (KeyCode::U, RewriteTo(KeyCode::G.to_u32())),
-            (KeyCode::I, RewriteTo(KeyCode::C.to_u32())),
-            (KeyCode::O, RewriteTo(KeyCode::R.to_u32())),
-            (KeyCode::P, RewriteTo(KeyCode::L.to_u32())),
-            (KeyCode::BSlash, RewriteTo(KeyCode::Equal.to_u32())),
-            //(KeyCode::A, RewriteTo(KeyCode::O.to_u32())),
-            (KeyCode::S, RewriteTo(KeyCode::O.to_u32())),
-            (KeyCode::D, RewriteTo(KeyCode::E.to_u32())),
-            (KeyCode::F, RewriteTo(KeyCode::U.to_u32())),
-            (KeyCode::G, RewriteTo(KeyCode::I.to_u32())),
-            (KeyCode::H, RewriteTo(KeyCode::D.to_u32())),
-            (KeyCode::J, RewriteTo(KeyCode::H.to_u32())),
-            (KeyCode::K, RewriteTo(KeyCode::T.to_u32())),
-            (KeyCode::L, RewriteTo(KeyCode::N.to_u32())),
-            (KeyCode::SColon, RewriteTo(KeyCode::S.to_u32())),
-            (KeyCode::Quote, RewriteTo(KeyCode::Minus.to_u32())),
-            (KeyCode::Z, RewriteTo(KeyCode::SColon.to_u32())),
-            (KeyCode::X, RewriteTo(KeyCode::Q.to_u32())),
-            (KeyCode::C, RewriteTo(KeyCode::J.to_u32())),
-            (KeyCode::V, RewriteTo(KeyCode::K.to_u32())),
-            (KeyCode::B, RewriteTo(KeyCode::X.to_u32())),
-            //(KeyCode::N, RewriteTo(KeyCode::N.to_u32())),
-            (KeyCode::M, RewriteTo(KeyCode::M.to_u32())),
-            (KeyCode::Comma, RewriteTo(KeyCode::W.to_u32())),
-            (KeyCode::Dot, RewriteTo(KeyCode::V.to_u32())),
-            (KeyCode::Slash, RewriteTo(KeyCode::Z.to_u32())),
-        ]);
-        keyboard.add_handler(Box::new(Debugger::new("A".to_string())));
-        let layer_id = keyboard.add_handler(Box::new(l));
-        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
-        keyboard.output.state().enable_handler(layer_id);
-        keyboard.add_handler(Box::new(Debugger::new("B".to_string())));
-        keyboard.add_handler(Box::new(USBKeyboard::new()));
-
-        keyboard.add_keypress(KeyCode::Q, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Quote]]);
-        keyboard.add_keyrelease(KeyCode::Q, 0);
-        keyboard.handle_keys().unwrap();
-        dbg!(&keyboard.output.reports);
-        check_output(&keyboard, &[&[KeyCode::Quote], &[]]);
     }
 }
