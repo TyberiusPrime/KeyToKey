@@ -18,6 +18,7 @@ pub trait ProcessKeys<T: USBKeyOut> {
         true
     }
 }
+
 /// The default bottom layer
 ///
 /// this simulates a bog standard regular USB
@@ -30,10 +31,12 @@ impl USBKeyboard {
     pub fn new() -> USBKeyboard {
         USBKeyboard {}
     }
+
 }
 fn is_usb_keycode(kc: u32) -> bool {
     return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
 }
+
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
@@ -479,6 +482,9 @@ pub enum OneShotStatus {
 /// press it, on_activate will be called,
 /// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
+/// 
+/// If timeout is > 0 and the key is pressed for at least that many ms,
+/// and on_deactivate will be called upon release
 ///
 /// OneShots have two triggers to accomidate the usual left/right modifier keys,
 /// just pass in Keycode::No if you want one trigger to be ignored
@@ -489,6 +495,7 @@ pub struct OneShot<M> {
     trigger2: u32,
     callbacks: M,
     status: OneShotStatus,
+    timeout: u16,
 }
 lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
@@ -499,6 +506,7 @@ impl<M: MacroCallback> OneShot<M> {
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
         callbacks: M,
+        timeout: u16
     ) -> OneShot<M> {
         ONESHOT_TRIGGERS.write().push(trigger1.to_u32());
         ONESHOT_TRIGGERS.write().push(trigger2.to_u32());
@@ -507,6 +515,7 @@ impl<M: MacroCallback> OneShot<M> {
             trigger2: trigger2.to_u32(),
             callbacks,
             status: OneShotStatus::Off,
+            timeout,
         }
     }
 }
@@ -554,7 +563,12 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         match self.status {
                             OneShotStatus::Held => {
-                                self.status = OneShotStatus::Triggered;
+                                if self.timeout > 0 && kc.ms_since_last > self.timeout { 
+                                    self.status = OneShotStatus::Off;
+                                    self.callbacks.on_deactivate(output)
+                                } else {
+                                    self.status = OneShotStatus::Triggered;
+                                }
                             }
 
                             OneShotStatus::HeldUsed => {
@@ -965,7 +979,7 @@ mod tests {
             down_counter: 0,
             up_counter: 0,
         }));
-        let t = OneShot::new(0xF0000u32, 0xF0001u32, counter.clone());
+        let t = OneShot::new(0xF0000u32, 0xF0001u32, counter.clone(), 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1122,6 +1136,40 @@ mod tests {
         assert!(counter.read().up_counter == 3);
         assert!(keyboard.events.is_empty());
     }
+    #[test]
+    fn test_oneshot_timeout() {
+        #[derive(Debug)]
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let timeout = 1000;
+        let t = OneShot::new(0xF0000u32, 0xF0001u32, counter.clone(), timeout);
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(t));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        for trigger in [0xF0000u32, 0xF0001u32].iter() {
+            counter.write().down_counter = 0;
+            counter.write().up_counter = 0;
+            keyboard.output.clear();
+            //first press - sets
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            dbg!(counter.read());
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 0);
+            assert!(keyboard.events.is_empty());
+            check_output(&keyboard, &[&[KeyCode::H], &[]]);
+            keyboard.output.clear();
+            //first release - no change
+            keyboard.add_keyrelease(trigger, timeout+1);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 1);
+            assert!(keyboard.events.is_empty());
+        }
+    }
+
     #[test]
     fn test_press_release() {
         let counter = Arc::new(RwLock::new(PressCounter {

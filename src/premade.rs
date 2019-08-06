@@ -135,31 +135,33 @@ impl MacroCallback for ActionHandler {
     }
 }
 /// make the shift keys behave as a OneShot
-pub fn one_shot_shift() -> Box<OneShot<ActionShift>> {
+pub fn one_shot_shift(timeout: u16) -> Box<OneShot<ActionShift>> {
     Box::new(OneShot::new(
         KeyCode::LShift,
         KeyCode::RShift,
         ActionShift {},
+        timeout
     ))
 }
 /// make the ctrl keys behave as a OneShot
-pub fn one_shot_ctrl() -> Box<OneShot<ActionCtrl>> {
-    Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, ActionCtrl {}))
+pub fn one_shot_ctrl(timeout: u16) -> Box<OneShot<ActionCtrl>> {
+    Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, ActionCtrl {}, timeout))
 }
 /// make the alt keys behave as a OneShot
-pub fn one_shot_alt() -> Box<OneShot<ActionAlt>> {
-    Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, ActionAlt {}))
+pub fn one_shot_alt(timeout: u16) -> Box<OneShot<ActionAlt>> {
+    Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, ActionAlt {}, timeout))
 }
 /// make the gui/windows key behave as a OneShot
-pub fn one_shot_gui() -> Box<OneShot<ActionGui>> {
-    Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, ActionGui {}))
+pub fn one_shot_gui(timeout: u16) -> Box<OneShot<ActionGui>> {
+    Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, ActionGui {}, timeout))
 }
 /// Toggle a handler (layer) based on OneShot behaviour
 pub fn one_shot_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
+    timeout: u16
 ) -> Box<OneShot<ActionHandler>> {
-    Box::new(OneShot::new(trigger, KeyCode::No, ActionHandler { id }))
+    Box::new(OneShot::new(trigger, KeyCode::No, ActionHandler { id }, timeout))
 }
 pub fn space_cadet_handler(
     trigger: impl AcceptsKeycode,
@@ -172,6 +174,7 @@ pub fn space_cadet_handler(
 /// Handler for turing Copy/Paste/Cut Keycodes into 'universal' 
 /// Ctrl-Insert, Shift-insert, shift-delete keystrokes 
 /// for dedicated copy paste keys
+/// 0
 pub struct CopyPaste  {}
 
 impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
@@ -290,7 +293,7 @@ mod tests {
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        keyboard.add_handler(premade::one_shot_shift());
+        keyboard.add_handler(premade::one_shot_shift(0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -341,9 +344,9 @@ mod tests {
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let dv = keyboard.add_handler(premade::dvorak());
-        keyboard.add_handler(premade::one_shot_shift());
-        keyboard.add_handler(premade::one_shot_ctrl());
-        keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv));
+        keyboard.add_handler(premade::one_shot_shift(0));
+        keyboard.add_handler(premade::one_shot_ctrl(0));
+        keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv, 0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -402,7 +405,7 @@ mod tests {
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        keyboard.add_handler(premade::one_shot_shift());
+        keyboard.add_handler(premade::one_shot_shift(0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
