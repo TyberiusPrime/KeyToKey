@@ -90,6 +90,7 @@ impl MacroCallback for OneShotShift {
     }
 }
 
+/// make the shift keys behave as a OneShot
 pub fn one_shot_shift() -> Box<OneShot<OneShotShift>> {
     Box::new(OneShot::new(KeyCode::LShift, KeyCode::RShift, OneShotShift {}))
 }
@@ -106,6 +107,7 @@ impl MacroCallback for OneShotCtrl {
     }
 }
 
+/// make the ctrl keys behave as a OneShot
 pub fn one_shot_ctrl() -> Box<OneShot<OneShotCtrl>> {
     Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, OneShotCtrl {}))
 }
@@ -122,6 +124,7 @@ impl MacroCallback for OneShotAlt {
     }
 }
 
+/// make the alt keys behave as a OneShot
 pub fn one_shot_alt() -> Box<OneShot<OneShotAlt>> {
     Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, OneShotAlt {}))
 }
@@ -139,8 +142,28 @@ impl MacroCallback for OneShotGui {
     }
 }
 
+/// make the gui/windows key behave as a OneShot
 pub fn one_shot_gui() -> Box<OneShot<OneShotGui>> {
     Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, OneShotGui {}))
+}
+
+/// Internal type for one_shot_handler
+pub struct OneShotHandler {
+    id: HandlerID
+}
+
+impl MacroCallback for OneShotHandler {
+    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+        output.state().enable_handler(self.id);
+    }
+    fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+        output.state().disable_handler(self.id);
+    }
+}
+
+/// Toggle a handler (layer) based on OneShot behaviour
+pub fn one_shot_handler(trigger: impl AcceptsKeycode, id: HandlerID) -> Box<OneShot<OneShotHandler>> {
+    Box::new(OneShot::new(trigger, KeyCode::No, OneShotHandler {id}))
 }
 
 
@@ -262,8 +285,10 @@ mod tests {
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let dv = keyboard.add_handler(premade::dvorak());
         keyboard.add_handler(premade::one_shot_shift());
         keyboard.add_handler(premade::one_shot_ctrl());
+        keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
 
         keyboard.add_keypress(KeyCode::RShift, 0);
@@ -292,18 +317,39 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //key is released, but shift is still set
         keyboard.output.clear();
 
+        assert!(!keyboard.output.state().is_handler_enabled(dv));
+        keyboard.add_keypress(0xF0000u32, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().ctrl);
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().is_handler_enabled(dv));
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
 
-        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().ctrl);
-        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl, KeyCode::A]]); //key is released, but shift is still set
+        assert!(keyboard.output.state().is_handler_enabled(dv));
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //key is released, but shift is still set
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(KeyCode::A, 0);
+
+
+        keyboard.add_keypress(KeyCode::X, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().ctrl);
+        assert!(keyboard.output.state().is_handler_enabled(dv));
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl, KeyCode::Q]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
         assert!(!keyboard.output.state().ctrl);
+        assert!(!keyboard.output.state().is_handler_enabled(dv));
+
         check_output(&keyboard, &[&[]]); //key is released, but shift is still set
     }
 

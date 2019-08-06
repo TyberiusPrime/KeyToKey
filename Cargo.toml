@@ -17,6 +17,10 @@ spin="0.5"
 #num_enum = {path = "../num_enum"}
 no-std-compat = {version="0.1.0", features=["alloc", ]}
 
+[dependencies.lazy_static]
+version = "1.3.0"
+features = ["spin_no_std"]
+
 [dependencies.smallbitvec]
 version = "2.4.0"
 path = "../smallbitvec"

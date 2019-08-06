@@ -3,6 +3,8 @@ use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
+use lazy_static::lazy_static;
+use spin::RwLock;
 
 use crate::USBKeyOut;
 
@@ -490,10 +492,12 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
 }
 
 /// A OneShot key
-/// press it, on_toggle_on will be called,
-/// on_toggle_off will be called after the next key
-/// release of if the OneShot trigger is pressed again
+/// press it, on_activate will be called,
+/// on_deactivate will be called after the next non-oneshot key release 
+/// or if the OneShot trigger is pressed again
 /// 
+/// OneShots have two triggers to accomidate the usual left/right modifier keys,
+/// just pass in Keycode::No if you want one trigger to be ignored 
 /// note that the oneshots always lead to the left variant of the modifier being sent,
 /// even if they're being triggered by the right one.
 pub struct OneShot<M> {
@@ -502,12 +506,20 @@ pub struct OneShot<M> {
     callbacks: M,
     active: bool,
 }
+
+lazy_static! {
+    /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
+    static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
+}
+
 impl<M: MacroCallback> OneShot<M> {
     pub fn new(
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
         callbacks: M,
     ) -> OneShot<M> {
+        ONESHOT_TRIGGERS.write().push(trigger1.to_u32());
+        ONESHOT_TRIGGERS.write().push(trigger2.to_u32());
         OneShot {
             trigger1: trigger1.to_u32(),
             trigger2: trigger2.to_u32(),
@@ -519,9 +531,6 @@ impl<M: MacroCallback> OneShot<M> {
 
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
-        fn is_modifier(keycode: u32) -> bool {
-            KeyCode::LCtrl.to_u32() <= keycode && keycode <= KeyCode::RGui.to_u32()
-        }
         for (event, status) in events.iter_mut() {
             //a sticky key
             // on press if not active -> active
@@ -544,7 +553,7 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         *status = EventStatus::Handled;
-                    } else if !is_modifier(kc.keycode){
+                    } else if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
                         self.active = false;
                         self.callbacks.on_deactivate(output)
                     }
