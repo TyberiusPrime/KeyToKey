@@ -67,7 +67,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                     } else if kc.keycode == KeyCode::LGui.into()
                         || kc.keycode == KeyCode::RGui.into()
                     {
-                        output.state().meta = false;
+                        output.state().gui = false;
                     }
                 }
                 Event::KeyPress(kc) => {
@@ -98,7 +98,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         } else if kc.keycode == KeyCode::LGui.into()
                             || kc.keycode == KeyCode::RGui.into()
                         {
-                            output.state().meta = true;
+                            output.state().gui = true;
                             modifiers_sent.set(3, true);
                         }
                     }
@@ -130,7 +130,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
         if output.state().ctrl && !modifiers_sent[2] {
             output.register_key(KeyCode::LCtrl);
         }
-        if output.state().meta && !modifiers_sent[3] {
+        if output.state().gui && !modifiers_sent[3] {
             output.register_key(KeyCode::LGui);
         }
 
@@ -493,31 +493,35 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
 /// press it, on_toggle_on will be called,
 /// on_toggle_off will be called after the next key
 /// release of if the OneShot trigger is pressed again
-pub struct OneShot<'a, T, F1: FnMut(&mut T), F2: FnMut(&mut T)> {
-    keycode: u32,
-    on_toggle_on: F1,
-    on_toggle_off: F2,
+/// 
+/// note that the oneshots always lead to the left variant of the modifier being sent,
+/// even if they're being triggered by the right one.
+pub struct OneShot<M> {
+    trigger1: u32,
+    trigger2: u32,
+    callbacks: M,
     active: bool,
-    phantom: core::marker::PhantomData<&'a T>,
 }
-impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> OneShot<'a, T, F1, F2> {
+impl<M: MacroCallback> OneShot<M> {
     pub fn new(
-        trigger: impl AcceptsKeycode,
-        on_toggle_on: F1,
-        on_toggle_off: F2,
-    ) -> OneShot<'a, T, F1, F2> {
+        trigger1: impl AcceptsKeycode,
+        trigger2: impl AcceptsKeycode,
+        callbacks: M,
+    ) -> OneShot<M> {
         OneShot {
-            keycode: trigger.to_u32(),
-            on_toggle_on,
-            on_toggle_off,
+            trigger1: trigger1.to_u32(),
+            trigger2: trigger2.to_u32(),
+            callbacks,
             active: false,
-            phantom: core::marker::PhantomData,
         }
     }
 }
 
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for OneShot<'_, T, F1, F2> {
+impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+        fn is_modifier(keycode: u32) -> bool {
+            KeyCode::LCtrl.to_u32() <= keycode && keycode <= KeyCode::RGui.to_u32()
+        }
         for (event, status) in events.iter_mut() {
             //a sticky key
             // on press if not active -> active
@@ -526,23 +530,23 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T> for OneS
             // on release -> noop?
             match event {
                 Event::KeyPress(kc) => {
-                    if kc.keycode == self.keycode {
+                    if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         *status = EventStatus::Handled;
                         if self.active {
                             self.active = false;
-                            (self.on_toggle_off)(output);
+                            self.callbacks.on_deactivate(output)
                         } else {
                             self.active = true;
-                            (self.on_toggle_on)(output);
+                            self.callbacks.on_activate(output)
                         }
                     }
                 }
                 Event::KeyRelease(kc) => {
-                    if kc.keycode == self.keycode {
+                    if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         *status = EventStatus::Handled;
-                    } else {
+                    } else if !is_modifier(kc.keycode){
                         self.active = false;
-                        (self.on_toggle_off)(output);
+                        self.callbacks.on_deactivate(output)
                     }
                 }
                 Event::TimeOut(_) => {}
@@ -769,7 +773,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
     }
 }
 
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
@@ -944,30 +947,128 @@ mod tests {
     }
 
     #[test]
-    fn test_toggle_macro() {
-        let down_counter = RwLock::new(0);
-        let up_counter = RwLock::new(0);
-        let t = OneShot::new(
-            0xF0000u32,
-            |output: &mut KeyOutCatcher| {
+    fn test_oneshot() {
+        #[derive(Debug)]
+        struct PressCounter {
+            down_counter: u8,
+            up_counter: u8,
+        }
+        impl MacroCallback for Arc<RwLock<PressCounter>> {
+            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+                self.write().down_counter += 1;
                 output.send_keys(&[KeyCode::H]);
-                let mut dc = down_counter.write();
-                *dc += 1;
-            },
-            |_output| {
-                let mut dc = up_counter.write();
-                *dc += 1;
-            },
-        );
+            }
+            fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {
+                self.write().up_counter += 1;
+            }
+        }
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let t = OneShot::new(0xF0000u32, 0xF0001u32, counter.clone());
 
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        for trigger in [0xF0000u32, 0xF0001u32].iter() {
+            counter.write().down_counter = 0;
+            counter.write().up_counter = 0;
+            keyboard.output.clear();
+            //first press - sets
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            dbg!(counter.read());
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 0);
+            assert!(keyboard.events.is_empty());
+            check_output(&keyboard, &[&[KeyCode::H], &[]]);
+            keyboard.output.clear();
+
+            //first release - no change
+            keyboard.add_keyrelease(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 0);
+            assert!(keyboard.events.is_empty());
+
+            //second press - unsets
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 1);
+            assert!(keyboard.events.is_empty());
+
+            //second release - no change
+            keyboard.add_keyrelease(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 1);
+            assert!(counter.read().up_counter == 1);
+            assert!(keyboard.events.is_empty());
+
+            //third press - sets
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 2);
+            assert!(counter.read().up_counter == 1);
+            assert!(keyboard.events.is_empty());
+
+            keyboard.add_keypress(KeyCode::A, 20);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 2);
+            assert!(counter.read().up_counter == 1);
+
+            keyboard.add_keyrelease(KeyCode::A, 20);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 2);
+            assert!(counter.read().up_counter == 2);
+
+            //third release - no change
+            keyboard.add_keyrelease(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 2);
+            assert!(counter.read().up_counter == 2);
+            assert!(keyboard.events.is_empty());
+
+            //fourth press - sets
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 3);
+            assert!(counter.read().up_counter == 2);
+            assert!(keyboard.events.is_empty());
+
+            //fifth release - no change
+            keyboard.add_keyrelease(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 3);
+            assert!(counter.read().up_counter == 2);
+            assert!(keyboard.events.is_empty());
+
+            //sixth press - up
+            keyboard.add_keypress(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 3);
+            assert!(counter.read().up_counter == 3);
+            assert!(keyboard.events.is_empty());
+
+            //sixth release - no change
+            keyboard.add_keyrelease(trigger, 0);
+            keyboard.handle_keys().unwrap();
+            assert!(counter.read().down_counter == 3);
+            assert!(counter.read().up_counter == 3);
+            assert!(keyboard.events.is_empty());
+        }
+        //what happens if you use both triggers
+        counter.write().down_counter = 0;
+        counter.write().up_counter = 0;
+        keyboard.output.clear();
         //first press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 0);
+        dbg!(counter.read());
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
@@ -975,54 +1076,77 @@ mod tests {
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 0);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         assert!(keyboard.events.is_empty());
 
         //second press - unsets
-        keyboard.add_keypress(0xF0000u32, 0);
+        keyboard.add_keypress(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 1);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
 
         //second release - no change
-        keyboard.add_keyrelease(0xF0000u32, 0);
+        keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 1);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
 
         //third press - sets
-        keyboard.add_keypress(0xF0000u32, 0);
+        keyboard.add_keypress(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 2);
-        assert!(*up_counter.read() == 1);
+        assert!(counter.read().down_counter == 2);
+        assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
 
         keyboard.add_keypress(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 2);
-        assert!(*up_counter.read() == 1);
+        assert!(counter.read().down_counter == 2);
+        assert!(counter.read().up_counter == 1);
 
         keyboard.add_keyrelease(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 2);
-        assert!(*up_counter.read() == 2);
+        assert!(counter.read().down_counter == 2);
+        assert!(counter.read().up_counter == 2);
 
         //third release - no change
-        keyboard.add_keyrelease(0xF0000u32, 0);
+        keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 2);
-        assert!(*up_counter.read() == 2);
+        assert!(counter.read().down_counter == 2);
+        assert!(counter.read().up_counter == 2);
         assert!(keyboard.events.is_empty());
 
         //fourth press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*down_counter.read() == 3);
-        assert!(*up_counter.read() == 2);
+        assert!(counter.read().down_counter == 3);
+        assert!(counter.read().up_counter == 2);
         assert!(keyboard.events.is_empty());
+
+        //fifth release - no change
+        keyboard.add_keyrelease(0xF0000u32, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(counter.read().down_counter == 3);
+        assert!(counter.read().up_counter == 2);
+        assert!(keyboard.events.is_empty());
+
+        //sixth press - up
+        keyboard.add_keypress(0xF0001u32, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(counter.read().down_counter == 3);
+        assert!(counter.read().up_counter == 3);
+        assert!(keyboard.events.is_empty());
+
+        //sixth release - no change
+        keyboard.add_keyrelease(0xF0001u32, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(counter.read().down_counter == 3);
+        assert!(counter.read().up_counter == 3);
+        assert!(keyboard.events.is_empty());
+
+
     }
 
     #[test]
@@ -1603,7 +1727,7 @@ mod tests {
         keyboard.output.clear();
 
         keyboard.output.state().alt = false;
-        keyboard.output.state().meta = true;
+        keyboard.output.state().gui = true;
 
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1625,7 +1749,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::LAlt, 0);
@@ -1634,7 +1758,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::LCtrl, 0);
@@ -1646,7 +1770,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::LGui, 0);
@@ -1663,7 +1787,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(keyboard.output.state().meta);
+        assert!(keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::LGui, 0);
@@ -1676,7 +1800,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::LCtrl, 0);
@@ -1685,7 +1809,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::LAlt, 0);
@@ -1694,7 +1818,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::LShift, 0);
@@ -1703,7 +1827,7 @@ mod tests {
         assert!(!keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::RShift, 0);
@@ -1712,7 +1836,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::RAlt, 0);
@@ -1721,7 +1845,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::RCtrl, 0);
@@ -1733,7 +1857,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::RGui, 0);
@@ -1750,7 +1874,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(keyboard.output.state().meta);
+        assert!(keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::RGui, 0);
@@ -1762,7 +1886,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::RCtrl, 0);
@@ -1773,7 +1897,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::RAlt, 0);
@@ -1782,7 +1906,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::RShift, 0);
@@ -1791,7 +1915,7 @@ mod tests {
         assert!(!keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
 
         keyboard.add_keypress(KeyCode::LShift, 0);
@@ -1801,7 +1925,7 @@ mod tests {
         assert!(keyboard.output.state().shift);
         assert!(!keyboard.output.state().alt);
         assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().meta);
+        assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
     }
 

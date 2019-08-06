@@ -39,7 +39,7 @@ pub struct KeyboardState {
     pub shift: bool,
     pub ctrl: bool,
     pub alt: bool,
-    pub meta: bool,
+    pub gui: bool,
     pub unicode_mode: UnicodeSendMode,
     enabled_handlers: Vec<bool>,
 }
@@ -50,7 +50,7 @@ impl KeyboardState {
             shift: false,
             ctrl: false,
             alt: false,
-            meta: false,
+            gui: false,
             unicode_mode: UnicodeSendMode::Linux,
             enabled_handlers: Vec::new(),
         }
