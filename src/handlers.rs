@@ -496,6 +496,7 @@ pub enum OneShotStatus {
     Held,
     HeldUsed,
     Triggered,
+    TriggerUsed,
     Off,
 }
 /// A OneShot key
@@ -557,7 +558,22 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                                 self.status = OneShotStatus::Held;
                                 self.callbacks.on_activate(output)
                             }
-                            OneShotStatus::Held | OneShotStatus::HeldUsed => {}
+                            OneShotStatus::Held
+                            | OneShotStatus::HeldUsed
+                            | OneShotStatus::TriggerUsed => {}
+                        }
+                    } else {
+                        if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
+                            match self.status {
+                                OneShotStatus::Triggered => {
+                                    self.status = OneShotStatus::TriggerUsed
+                                }
+                                OneShotStatus::TriggerUsed => {
+                                    self.status = OneShotStatus::Off;
+                                    self.callbacks.on_deactivate(output)
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 }

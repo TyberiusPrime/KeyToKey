@@ -380,4 +380,50 @@ mod tests {
 
         check_output(&keyboard, &[&[]]); //key is released, but shift is still set
     }
+
+    #[test]
+    fn test_oneshot_rapid_typing() {
+        use crate::handlers;
+        //use crate::debug_handlers;
+        use crate::premade;
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(premade::one_shot_shift());
+        keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
+        assert!(keyboard.output.state().shift);
+
+        keyboard.add_keyrelease(KeyCode::RShift, 50);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::A, 50);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::B, 50);
+        keyboard.handle_keys().unwrap();
+        assert!(!keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::A, KeyCode::B]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::A, 50);
+        keyboard.handle_keys().unwrap();
+        assert!(!keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::B]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::A, 50);
+        keyboard.handle_keys().unwrap();
+        assert!(!keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::B]]); //key is released, but shift is still set
+        keyboard.output.clear();
+    }
 }
