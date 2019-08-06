@@ -1,10 +1,8 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::key_codes::KeyCode;
 use crate::{
     iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
 };
-
 pub struct KeyOutCatcher {
     keys_registered: Vec<u8>,
     pub reports: Vec<Vec<u8>>,
@@ -28,7 +26,6 @@ impl USBKeyOut for KeyOutCatcher {
     fn state(&mut self) -> &mut KeyboardState {
         return &mut self.state;
     }
-
     fn send_keys(&mut self, keys: &[KeyCode]) {
         self.reports
             .push(keys.into_iter().map(|&x| x.to_u8()).collect());
@@ -56,7 +53,6 @@ pub fn check_output(keyboard: &Keyboard<KeyOutCatcher>, should: &[&[KeyCode]]) {
         }
     }
 }
-
 /// send a key whenever a time out occurs
 pub struct TimeoutLogger {
     keycode: KeyCode,

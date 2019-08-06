@@ -7,7 +7,6 @@ use crate::USBKeyOut;
 ///
 ///
 use no_std_compat::prelude::v1::*;
-
 fn nibble_to_keycode(nibble: u8) -> KeyCode {
     match nibble {
         0 => KeyCode::Kb0,
@@ -43,7 +42,6 @@ fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
         nibble_to_keycode(((x >> 32 - 32) & 0xf) as u8),
     ];
 }
-
 /// this handler helps you build a translation table for MatrixToStream
 /// by outputing the keycode observed as
 /// .into()<Enter>Hex-Keycode\tKeyCode::
@@ -74,7 +72,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
         }
     }
 }
-
 /// Debug a keystream at any point in the handling
 /// by adding a DebugStream with a callback that knows
 /// how to write something.
@@ -118,7 +115,6 @@ impl<T: USBKeyOut, F: FnMut(String)> ProcessKeys<T> for DebugStream<F> {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
@@ -181,7 +177,6 @@ mod tests {
                 ]
         );
         dbg!(transform_u32_to_keycodes(255));
-
         assert!(
             transform_u32_to_keycodes(256 + 0xA2)
                 == [

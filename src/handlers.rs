@@ -5,9 +5,7 @@ use lazy_static::lazy_static;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
 use spin::RwLock;
-
 use crate::USBKeyOut;
-
 /// Handlers are defined by this trait
 ///
 /// they process the events, set their status to either Handled or Ignored
@@ -20,7 +18,6 @@ pub trait ProcessKeys<T: USBKeyOut> {
         true
     }
 }
-
 /// The default bottom layer
 ///
 /// this simulates a bog standard regular USB
@@ -29,17 +26,14 @@ pub trait ProcessKeys<T: USBKeyOut> {
 ///
 /// key repeat is whatever usb does...
 pub struct USBKeyboard {}
-
 impl USBKeyboard {
     pub fn new() -> USBKeyboard {
         USBKeyboard {}
     }
 }
-
 fn is_usb_keycode(kc: u32) -> bool {
     return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
@@ -135,11 +129,9 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
         if output.state().gui && !modifiers_sent[3] {
             output.register_key(KeyCode::LGui);
         }
-
         output.send_registered();
     }
 }
-
 /// This processor sends unicode 'characters'
 /// just map your keys to unicode 'characters' (if code > 256)
 /// for unicode codes < 256 use unicode code + UNICODE_BELOW_256
@@ -191,14 +183,12 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
         }
     }
 }
-
 #[derive(PartialEq)]
 enum MatchResult<'a> {
     Match(&'a str),
     WontMatch,
     NeedsMoreInput,
 }
-
 pub struct Leader<'a> {
     trigger: u32,
     mappings: Vec<(Vec<u32>, &'a str)>,
@@ -206,7 +196,6 @@ pub struct Leader<'a> {
     prefix: Vec<u32>, //todo: refactor to not need this but use repeated iterators?
     active: bool,
 }
-
 impl<'a> Leader<'a> {
     pub fn new<T: AcceptsKeycode>(
         trigger: impl AcceptsKeycode,
@@ -243,7 +232,6 @@ impl<'a> Leader<'a> {
         result
     }
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
@@ -285,7 +273,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
         }
     }
 }
-
 pub enum LayerAction<'a> {
     RewriteTo(u32),
     RewriteToShifted(u32, u32),
@@ -296,7 +283,6 @@ pub enum LayerAction<'a> {
 pub struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
 }
-
 impl Layer<'_> {
     pub fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>) -> Layer<'_> {
         Layer {
@@ -307,7 +293,6 @@ impl Layer<'_> {
         }
     }
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
@@ -377,18 +362,15 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
             }
         }
     }
-
     fn default_enabled(&self) -> bool {
         false
     }
 }
-
 ///A trait for macro callbacks
 pub trait MacroCallback {
     fn on_activate(&mut self, output: &mut impl USBKeyOut);
     fn on_deactivate(&mut self, output: &mut impl USBKeyOut);
 }
-
 /// The simples callback -
 /// call on_press(output: impl USBKeyOut) on key press
 /// and on_release(output) on release))
@@ -407,7 +389,6 @@ impl<M: MacroCallback> PressReleaseMacro<M> {
         }
     }
 }
-
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
@@ -429,7 +410,6 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
         }
     }
 }
-
 /// a macro that is called 'on' on the the first keypress
 /// and off on the second keyrelease.
 /// Using this you can implement e.g. sticky modifiers
@@ -456,7 +436,6 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> StickyMacro<'a, T, 
         }
     }
 }
-
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     for StickyMacro<'_, T, F1, F2>
 {
@@ -490,7 +469,6 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
         }
     }
 }
-
 #[repr(u8)]
 pub enum OneShotStatus {
     Held,
@@ -514,12 +492,10 @@ pub struct OneShot<M> {
     callbacks: M,
     status: OneShotStatus,
 }
-
 lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
     static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
 }
-
 impl<M: MacroCallback> OneShot<M> {
     pub fn new(
         trigger1: impl AcceptsKeycode,
@@ -536,7 +512,6 @@ impl<M: MacroCallback> OneShot<M> {
         }
     }
 }
-
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in events.iter_mut() {
@@ -607,7 +582,6 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
         }
     }
 }
-
 pub struct TapDance<'a, T, F> {
     trigger: u32,
     tap_count: u8,
@@ -616,7 +590,6 @@ pub struct TapDance<'a, T, F> {
     timeout_ms: u16,
     phantom: core::marker::PhantomData<&'a T>,
 }
-
 impl<'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F> {
     pub fn new(trigger: impl AcceptsKeycode, on_tap_complete: F) -> TapDance<'a, T, F> {
         TapDance {
@@ -628,7 +601,6 @@ impl<'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F> {
         }
     }
 }
-
 impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
@@ -659,38 +631,25 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
         }
     }
 }
-
-pub struct SpaceCadet<'a, T, F1, F2> {
+pub struct SpaceCadet<M> {
     trigger: u32,
-    on_activate: F1,
-    on_deactivate: F2,
+    callbacks: M,
     press_number: u8,
     down: bool,
     activated: bool,
-    phantom: core::marker::PhantomData<&'a T>,
 }
-
-impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> SpaceCadet<'a, T, F1, F2> {
-    pub fn new(
-        trigger: impl AcceptsKeycode,
-        on_activate: F1,
-        on_deactivate: F2,
-    ) -> SpaceCadet<'a, T, F1, F2> {
+impl<M: MacroCallback> SpaceCadet<M> {
+    pub fn new(trigger: impl AcceptsKeycode, callbacks: M) -> SpaceCadet<M> {
         SpaceCadet {
             trigger: trigger.to_u32(),
-            on_activate,
-            on_deactivate,
-            press_number: 0,
+            callbacks,
+            press_number: 0, //what was the running id of this?
             down: false,
             activated: false,
-            phantom: core::marker::PhantomData,
         }
     }
 }
-
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
-    for SpaceCadet<'_, T, F1, F2>
-{
+impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for SpaceCadet<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         let mut initial_keypress_status: Option<EventStatus> = None;
         for (event, status) in iter_unhandled_mut(events) {
@@ -703,7 +662,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                             //let the downstream handle it!
                             initial_keypress_status = Some(EventStatus::Unhandled);
                         } else {
-                            (self.on_deactivate)(output);
+                            self.callbacks.on_deactivate(output);
                             *status = EventStatus::Handled;
                             initial_keypress_status = Some(EventStatus::Handled);
                         }
@@ -717,7 +676,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                     } else if self.down {
                         //trigger has been seen..
                         if !self.activated {
-                            (self.on_activate)(output);
+                            self.callbacks.on_activate(output);
                         }
                         self.activated = true;
                         initial_keypress_status = Some(EventStatus::Ignored);
@@ -728,7 +687,6 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                 Event::TimeOut(_) => {}
             }
         }
-
         match initial_keypress_status {
             Some(new_status) => {
                 for (event, status) in events.iter_mut() {
@@ -746,14 +704,12 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
         }
     }
 }
-
 pub struct AutoShift {
     shift_letters: bool,
     shift_numbers: bool,
     shift_special: bool,
     threshold_ms: u16,
 }
-
 impl AutoShift {
     pub fn new(threshold_ms: u16) -> AutoShift {
         AutoShift {
@@ -763,7 +719,6 @@ impl AutoShift {
             threshold_ms,
         }
     }
-
     fn should_autoshift(&self, keycode: u32) -> bool {
         return (self.shift_letters
             && keycode >= KeyCode::A.to_u32()
@@ -776,7 +731,6 @@ impl AutoShift {
                 && keycode <= KeyCode::Slash.to_u32());
     }
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         let mut presses = Vec::new();
@@ -825,7 +779,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
@@ -834,7 +787,6 @@ mod tests {
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
-
     use crate::handlers::{
         AutoShift, Layer, LayerAction, Leader, MacroCallback, MatchResult, OneShot,
         PressReleaseMacro, SpaceCadet, StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
@@ -845,20 +797,16 @@ mod tests {
     };
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-
     use alloc::sync::Arc;
     use spin::RwLock;
-
     pub struct Debugger {
         s: String,
     }
-
     impl Debugger {
         fn new(s: String) -> Debugger {
             Debugger { s }
         }
     }
-
     impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
         fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
             println!("{}, {:?}", self.s, events);
@@ -888,20 +836,17 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[A]]);
         assert!(!keyboard.events.is_empty());
-
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[A, X]]);
         assert!(!keyboard.events.is_empty());
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::A, 20);
         assert!(keyboard.events.len() == 3);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[X]]);
         assert!(!keyboard.events.is_empty());
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::X, 20);
         assert!(keyboard.events.len() == 2);
@@ -909,7 +854,6 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         assert!(keyboard.events.is_empty());
     }
-
     #[test]
     fn test_unicode_keyboard_linux() {
         use crate::key_codes::KeyCode::*;
@@ -922,7 +866,6 @@ mod tests {
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.reports.len() == 0);
         assert!(keyboard.events.is_empty()); // we eat the keypress though
-
         keyboard.add_keyrelease(0x00E4, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -934,10 +877,8 @@ mod tests {
                 &[],
             ],
         );
-
         assert!(keyboard.events.is_empty()); // we eat the keypress though
     }
-
     #[test]
     fn test_unicode_keyboard_wincompose() {
         use crate::key_codes::KeyCode::*;
@@ -950,7 +891,6 @@ mod tests {
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.reports.len() == 0);
         assert!(keyboard.events.is_empty()); // we eat the keypress though
-
         keyboard.add_keyrelease(0x03B4, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
@@ -960,7 +900,6 @@ mod tests {
         );
         assert!(keyboard.events.is_empty()); // we eat the keypress though
     }
-
     #[test]
     fn test_unicode_while_depressed() {
         use crate::key_codes::KeyCode::*;
@@ -971,7 +910,6 @@ mod tests {
         keyboard.add_keypress(A, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
-
         check_output(&keyboard, &[&[A]]);
         keyboard.output.clear();
         keyboard.add_keypress(0x3B4u32, 0);
@@ -990,7 +928,6 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         assert!(keyboard.events.is_empty());
     }
-
     #[test]
     fn test_panic_on_unhandled() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -998,33 +935,42 @@ mod tests {
         keyboard.add_keypress(0xF0000u32, 0);
         assert!(keyboard.handle_keys().is_err());
     }
-
+    #[derive(Debug)]
+    struct PressCounter {
+        down_counter: u8,
+        up_counter: u8,
+    }
+    impl MacroCallback for Arc<RwLock<PressCounter>> {
+        fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+            self.write().down_counter += 1;
+            output.send_keys(&[KeyCode::H]);
+        }
+        fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+            self.write().up_counter += 1;
+            output.send_keys(&[KeyCode::I]);
+        }
+    }
+    impl MacroCallback for PressCounter {
+        fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+            self.down_counter += 1;
+            output.send_keys(&[KeyCode::H]);
+        }
+        fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+            self.up_counter += 1;
+            output.send_keys(&[KeyCode::I]);
+        }
+    }
     #[test]
     fn test_oneshot() {
         #[derive(Debug)]
-        struct PressCounter {
-            down_counter: u8,
-            up_counter: u8,
-        }
-        impl MacroCallback for Arc<RwLock<PressCounter>> {
-            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
-                self.write().down_counter += 1;
-                output.send_keys(&[KeyCode::H]);
-            }
-            fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {
-                self.write().up_counter += 1;
-            }
-        }
         let counter = Arc::new(RwLock::new(PressCounter {
             down_counter: 0,
             up_counter: 0,
         }));
         let t = OneShot::new(0xF0000u32, 0xF0001u32, counter.clone());
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         for trigger in [0xF0000u32, 0xF0001u32].iter() {
             counter.write().down_counter = 0;
             counter.write().up_counter = 0;
@@ -1038,45 +984,38 @@ mod tests {
             assert!(keyboard.events.is_empty());
             check_output(&keyboard, &[&[KeyCode::H], &[]]);
             keyboard.output.clear();
-
             //first release - no change
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 1);
             assert!(counter.read().up_counter == 0);
             assert!(keyboard.events.is_empty());
-
             //second press - unsets
             keyboard.add_keypress(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 1);
             assert!(counter.read().up_counter == 1);
             assert!(keyboard.events.is_empty());
-
             //second release - no change
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 1);
             assert!(counter.read().up_counter == 1);
             assert!(keyboard.events.is_empty());
-
             //third press - sets
             keyboard.add_keypress(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 1);
             assert!(keyboard.events.is_empty());
-
             keyboard.add_keypress(KeyCode::A, 20);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 1);
-
             keyboard.add_keyrelease(KeyCode::A, 20);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 1); //trigger is being held
-
             //third release - release trigger after other
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
@@ -1084,28 +1023,24 @@ mod tests {
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 2);
             assert!(keyboard.events.is_empty());
-
             //fourth press - sets
             keyboard.add_keypress(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 3);
             assert!(counter.read().up_counter == 2);
             assert!(keyboard.events.is_empty());
-
             //fifth release - no change
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 3);
             assert!(counter.read().up_counter == 2);
             assert!(keyboard.events.is_empty());
-
             //sixth press - up
             keyboard.add_keypress(trigger, 0);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 3);
             assert!(counter.read().up_counter == 3);
             assert!(keyboard.events.is_empty());
-
             //sixth release - no change
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
@@ -1126,73 +1061,62 @@ mod tests {
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
-
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 1);
         assert!(counter.read().up_counter == 0);
         assert!(keyboard.events.is_empty());
-
         //second press - unsets
         keyboard.add_keypress(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 1);
         assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
-
         //second release - no change
         keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 1);
         assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
-
         //third press - sets
         keyboard.add_keypress(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
         assert!(counter.read().up_counter == 1);
         assert!(keyboard.events.is_empty());
-
         keyboard.add_keypress(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
         assert!(counter.read().up_counter == 1);
-
         keyboard.add_keyrelease(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
         assert!(counter.read().up_counter == 1); // still being held
-
         //third release - triggers deactivate
         keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
         assert!(counter.read().up_counter == 2);
         assert!(keyboard.events.is_empty());
-
         //fourth press - sets
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 3);
         assert!(counter.read().up_counter == 2);
         assert!(keyboard.events.is_empty());
-
         //fifth release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 3);
         assert!(counter.read().up_counter == 2);
         assert!(keyboard.events.is_empty());
-
         //sixth press - up
         keyboard.add_keypress(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 3);
         assert!(counter.read().up_counter == 3);
         assert!(keyboard.events.is_empty());
-
         //sixth release - no change
         keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
@@ -1200,29 +1124,13 @@ mod tests {
         assert!(counter.read().up_counter == 3);
         assert!(keyboard.events.is_empty());
     }
-
     #[test]
     fn test_press_release() {
-        struct PressCounter {
-            down_counter: u8,
-            up_counter: u8,
-        }
-        impl MacroCallback for Arc<RwLock<PressCounter>> {
-            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
-                self.write().down_counter += 1;
-                output.send_keys(&[KeyCode::H]);
-            }
-            fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
-                self.write().up_counter += 1;
-                output.send_keys(&[KeyCode::I]);
-            }
-        }
         let counter = Arc::new(RwLock::new(PressCounter {
             down_counter: 0,
             up_counter: 0,
         }));
         let t = PressReleaseMacro::new(0xF0000u32, counter.clone());
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1234,7 +1142,6 @@ mod tests {
         assert!(keyboard.events.is_empty());
         check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
-
         //first release - no change
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
@@ -1249,7 +1156,6 @@ mod tests {
             KeyCode::A,
             LayerAction::RewriteTo(KeyCode::X.into()),
         )]);
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1262,17 +1168,14 @@ mod tests {
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
-
         check_output(
             &keyboard,
             &[&[KeyCode::B], &[], &[KeyCode::X], &[], &[KeyCode::X], &[]],
         );
-
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
@@ -1286,7 +1189,6 @@ mod tests {
             &keyboard,
             &[&[KeyCode::X], &[KeyCode::X, KeyCode::B], &[KeyCode::X], &[]],
         );
-
         keyboard.output.clear();
         keyboard.output.state().disable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
@@ -1294,7 +1196,6 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
-
         keyboard.output.clear();
         keyboard.output.state().enable_handler(layer_id);
         keyboard.add_keypress(KeyCode::A, 0);
@@ -1314,7 +1215,6 @@ mod tests {
             KeyCode::A,
             LayerAction::RewriteToShifted(KeyCode::M.into(), KeyCode::Z.into()),
         )]);
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -1347,7 +1247,6 @@ mod tests {
         assert!(!(keyboard.output.state().shift));
         check_output(&keyboard, &[&[]]);
     }
-
     #[test]
     fn test_tapdance() {
         let l = TapDance::new(
@@ -1360,22 +1259,18 @@ mod tests {
             },
         );
         let timeout = l.timeout_ms;
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         //simplest case, one press/release then another key
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::Z, 20);
         keyboard.handle_keys().unwrap();
         //       keyboard.add_keyrelease(KeyCode::Z, 30);
@@ -1383,29 +1278,24 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::Z, 20);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.events.is_empty());
-
         //two taps, then another key
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::X, 20);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 30);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::Z, 40);
         keyboard.handle_keys().unwrap();
         //        keyboard.add_keyrelease(KeyCode::Z, 50);
@@ -1413,49 +1303,40 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::Z, 20);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.events.is_empty());
-
         //three taps, then a time out
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::X, 20);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 30);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::X, 20);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 30);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_timeout(timeout - 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_timeout(timeout + 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::C], &[]]);
     }
-
     #[test]
     fn test_sticky_macro() {
         let l = StickyMacro::new(
@@ -1463,40 +1344,33 @@ mod tests {
             |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::A]),
             |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::B]),
         );
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         //activate
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
         keyboard.output.clear();
-
         //ignore
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         //ignore
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         //deactivate
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B], &[]]);
     }
-
     #[test]
     fn test_leader() {
         use crate::key_codes::KeyCode::*;
         use core::convert::TryInto;
-
         let mut l = Leader::new(
             KeyCode::X,
             vec![
@@ -1525,62 +1399,50 @@ mod tests {
         l.prefix.push(C.into());
         assert!(l.match_prefix() == MatchResult::WontMatch);
         l.prefix.clear();
-
         let keyb = USBKeyboard::new();
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(keyb));
         keyboard.output.state().unicode_mode = UnicodeSendMode::Debug;
-
         //activate
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::B, 0);
         keyboard.add_keyrelease(KeyCode::B, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::C, 0);
         keyboard.add_keyrelease(KeyCode::C, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
-
         check_output(&keyboard, &[&[65u8.try_into().unwrap()], &[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::F, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::F, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[F], &[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         //test error case
         keyboard.add_keypress(KeyCode::C, 0);
         keyboard.add_keyrelease(KeyCode::C, 0);
@@ -1588,97 +1450,70 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[69u8.try_into().unwrap()], &[]]);
     }
-
     #[test]
-    fn test_spacecadet() {
-        let down_counter = RwLock::new(0);
-        let up_counter = RwLock::new(0);
-        let l = SpaceCadet::new(
-            KeyCode::X,
-            |output: &mut KeyOutCatcher| {
-                println!("activate");
-                let mut c = down_counter.write();
-                *c += 1;
-                output.send_keys(&[KeyCode::A])
-            },
-            |output: &mut KeyOutCatcher| {
-                println!("deactivate");
-                let mut c = up_counter.write();
-                *c += 1;
-                output.send_keys(&[KeyCode::B])
-            },
-        );
-
+    fn test_space_cadet() {
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let l = SpaceCadet::new(KeyCode::X, counter.clone());
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         //the tap...
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::X]]);
         keyboard.output.clear();
-
         assert!(keyboard.events.is_empty());
-
         //the modifier
         println!("as mod");
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::Z, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
-        check_output(&keyboard, &[&[KeyCode::A], &[KeyCode::Z]]);
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 0);
+        check_output(&keyboard, &[&[KeyCode::H], &[KeyCode::Z]]);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::Z, 0);
         keyboard.handle_keys().unwrap();
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 10);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::B], &[]]);
-        assert!(*down_counter.read() == 1);
-        assert!(*up_counter.read() == 1);
+        check_output(&keyboard, &[&[KeyCode::I], &[]]);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
         keyboard.output.clear();
     }
-
     #[test]
     fn test_autoshift() {
         let threshold = 200;
         let l = AutoShift::new(threshold);
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, threshold - 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::X], &[]]);
         keyboard.output.clear();
         dbg!(&keyboard.events);
         assert!(keyboard.events.is_empty());
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, threshold + 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
@@ -1690,101 +1525,80 @@ mod tests {
         let threshold = 200;
         let mut l = AutoShift::new(threshold);
         l.shift_letters = false;
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::Kb1, threshold - 1);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1], &[]]);
         keyboard.output.clear();
         dbg!(&keyboard.events);
         assert!(keyboard.events.is_empty());
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::Kb1, threshold + 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LShift], &[]]);
         keyboard.output.clear();
-
         //this now get's handled by the usb keyboard.
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::X]]);
         keyboard.output.clear()
     }
-
     #[test]
     fn test_modifiers_add_left_keycodes() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1]]);
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.output.state().shift = true;
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LShift]]);
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
         keyboard.output.clear();
-
         keyboard.output.state().shift = false;
         keyboard.output.state().ctrl = true;
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LCtrl]]);
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LCtrl]]);
         keyboard.output.clear();
-
         keyboard.output.state().ctrl = false;
         keyboard.output.state().alt = true;
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LAlt]]);
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LAlt]]);
         keyboard.output.clear();
-
         keyboard.output.state().alt = false;
         keyboard.output.state().gui = true;
-
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LGui]]);
-
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
@@ -1794,7 +1608,6 @@ mod tests {
     fn test_modifiers_set_by_keycodes() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
@@ -1803,7 +1616,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::LAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
@@ -1812,7 +1624,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::LCtrl, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -1824,7 +1635,6 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::LGui, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -1841,10 +1651,8 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::LGui, 0);
         keyboard.handle_keys().unwrap();
-
         check_output(
             &keyboard,
             &[&[KeyCode::LShift, KeyCode::LAlt, KeyCode::LCtrl]],
@@ -1854,7 +1662,6 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::LCtrl, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
@@ -1863,7 +1670,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::LAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
@@ -1872,7 +1678,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
@@ -1881,7 +1686,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift]]);
@@ -1890,7 +1694,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
@@ -1899,7 +1702,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -1911,7 +1713,6 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RGui, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -1928,7 +1729,6 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::RGui, 0);
         keyboard.handle_keys().unwrap();
         check_output(
@@ -1940,10 +1740,8 @@ mod tests {
         assert!(keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
-
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
         assert!(keyboard.output.state().shift);
@@ -1951,7 +1749,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::RAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift]]);
@@ -1960,7 +1757,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
@@ -1969,7 +1765,6 @@ mod tests {
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::LShift, 0);
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -1980,31 +1775,25 @@ mod tests {
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
     }
-
     #[test]
     fn test_enable_disable() {
-        struct PressCounter {}
-        impl MacroCallback for PressCounter {
-            fn on_activate(&mut self, output: &mut impl USBKeyOut) {
-                output.send_keys(&[KeyCode::B]);
-            }
-            fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
-                output.send_keys(&[KeyCode::C]);
-            }
-        }
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let prm = PressReleaseMacro::new(KeyCode::A, PressCounter {});
+        let prm = PressReleaseMacro::new(
+            KeyCode::A,
+            PressCounter {
+                up_counter: 0,
+                down_counter: 0,
+            },
+        );
         let no = keyboard.add_handler(Box::new(prm));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::B], &[]]);
+        check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.add_keyrelease(KeyCode::A, 10);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::B], &[], &[KeyCode::C], &[]]);
-
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::H], &[], &[KeyCode::I], &[]]);
         keyboard.output.clear();
         keyboard.output.state().disable_handler(no);
         keyboard.add_keypress(KeyCode::A, 0);
@@ -2014,7 +1803,6 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
     }
-
     #[test]
     fn test_unshift() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -2024,7 +1812,6 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LShift]]);
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
-
         check_output(
             &keyboard,
             &[&[KeyCode::LShift], &[KeyCode::LShift, KeyCode::A]],
@@ -2067,17 +1854,14 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift], &[]]);
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift], &[], &[KeyCode::A]]);
     }
-
     #[test]
     fn test_layer_double_rewrite() {
         use crate::handlers::LayerAction::RewriteTo;
         use crate::AcceptsKeycode;
-
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let l = Layer::new(vec![
             (KeyCode::A, RewriteTo(KeyCode::B.to_u32())),
@@ -2087,7 +1871,6 @@ mod tests {
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B]]);

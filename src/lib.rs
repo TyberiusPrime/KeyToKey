@@ -3,28 +3,23 @@
 // combos
 // tapdance enhancemeants, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
-
 // premade toggle/oneshot modifiers
 // key lock (repeat next key until it is pressed again)
 // mouse keys? - probably out of scope of this libary
 // steganograpyh
 // unsupported: disabling a layer when one of it's rewriteTo are active?
-
 #![allow(dead_code)]
 #![feature(drain_filter)]
 #![no_std]
-
 pub mod debug_handlers;
 pub mod handlers;
 mod key_codes;
 mod key_stream;
 pub mod premade;
 pub mod test_helpers;
-
 extern crate alloc;
 extern crate no_std_compat;
 extern crate spin;
-
 pub use crate::handlers::ProcessKeys;
 use crate::key_codes::UNICODE_BELOW_256;
 pub use crate::key_codes::{AcceptsKeycode, KeyCode};
@@ -32,7 +27,6 @@ use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
-
 /// current keyboard state.
 #[derive(Debug)]
 pub struct KeyboardState {
@@ -43,7 +37,6 @@ pub struct KeyboardState {
     pub unicode_mode: UnicodeSendMode,
     enabled_handlers: Vec<bool>,
 }
-
 impl KeyboardState {
     pub fn new() -> KeyboardState {
         KeyboardState {
@@ -58,20 +51,16 @@ impl KeyboardState {
     pub fn enable_handler(&mut self, no: HandlerID) {
         self.enabled_handlers[no] = true;
     }
-
     pub fn disable_handler(&mut self, no: HandlerID) {
         self.enabled_handlers[no] = false;
     }
-
     pub fn toggle_handler(&mut self, no: HandlerID) {
         self.enabled_handlers[no] = !self.enabled_handlers[no];
     }
-
     pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
         self.enabled_handlers[no]
     }
 }
-
 /// the main keyboard struct
 ///
 /// add handlers wit add_handler,
@@ -83,9 +72,7 @@ pub struct Keyboard<'a, T: USBKeyOut> {
     handlers: Vec<Box<dyn ProcessKeys<T> + Send + 'a>>,
     pub output: T,
 }
-
 type HandlerID = usize;
-
 impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     pub fn new(output: T) -> Keyboard<'a, T> {
         Keyboard {
@@ -95,7 +82,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
             output,
         }
     }
-
     /// add a handler, return a HandlerID
     /// which you may use with keyboard.output.state().enable_handler / disable_handler / toggle_handler / is_handler_enabled
     ///
@@ -108,7 +94,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         self.handlers.push(handler);
         return self.handlers.len() - 1;
     }
-
     /// handle an update to the event stream
     ///
     /// This returns OK(()) if all keys are handled by the handlers
@@ -142,13 +127,11 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         }
         Ok(())
     }
-
     //throw away unhandled key events
     pub fn clear_unhandled(&mut self) {
         self.events
             .drain_filter(|(_event, status)| (EventStatus::Unhandled == *status));
     }
-
     /// add a KeyPress event
     pub fn add_keypress<X: AcceptsKeycode>(&mut self, keycode: X, ms_since_last: u16) {
         let e = Key {
@@ -161,7 +144,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         self.events
             .push((Event::KeyPress(e), EventStatus::Unhandled));
     }
-
     /// add a KeyRelease event
     pub fn add_keyrelease<X: AcceptsKeycode>(&mut self, keycode: X, ms_since_last: u16) {
         let e = Key {
@@ -174,7 +156,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         self.events
             .push((Event::KeyRelease(e), EventStatus::Unhandled));
     }
-
     pub fn add_timeout(&mut self, ms_since_last: u16) {
         if let Some((event, _status)) = self.events.iter().last() {
             if let Event::TimeOut(_) = event {
@@ -185,7 +166,6 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
             .push((Event::TimeOut(ms_since_last), EventStatus::Unhandled));
     }
 }
-
 /// Different operating systems expect random unicode input
 /// as different key combinations
 /// unfortunatly, we can't detect what we're connected to,
@@ -199,7 +179,6 @@ pub enum UnicodeSendMode {
     // used by the tests
     Debug,
 }
-
 /// transform hex digits to USB keycodes
 /// used by the unicode senders
 fn hex_digit_to_keycode(digit: char) -> KeyCode {
@@ -225,7 +204,6 @@ fn hex_digit_to_keycode(digit: char) -> KeyCode {
         _ => panic!("Passed more than one digit to hex_digit_to_keycode"),
     }
 }
-
 /// the handlers use this trait to generate their output
 pub trait USBKeyOut {
     /// send these USB Keycodes concurrently rigth away.
@@ -234,13 +212,10 @@ pub trait USBKeyOut {
     fn register_key(&mut self, key: KeyCode);
     /// send registered keycodes (or an empty nothing-pressed status)
     fn send_registered(&mut self);
-
     /// helper that sends an empty status
     fn send_empty(&mut self);
-
     /// retrieve a mutable KeyboardState
     fn state(&mut self) -> &mut KeyboardState;
-
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {
             UnicodeSendMode::Linux => {
@@ -268,7 +243,6 @@ pub trait USBKeyOut {
             }
         }
     }
-
     /// send a utf-8 string to the host
     /// all characters are converted into unicode input!
     fn send_string(&mut self, s: &str) {
@@ -302,7 +276,6 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
     let keycode: KeyCode = keycode.try_into().unwrap();
     keycode
 }
-
 //so the tests 'just work'.
 #[cfg(test)]
 #[macro_use]

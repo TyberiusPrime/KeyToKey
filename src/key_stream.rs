@@ -1,5 +1,4 @@
 use no_std_compat::prelude::v1::*;
-
 #[derive(PartialEq, Debug)]
 pub struct Key {
     pub keycode: u32,
@@ -10,7 +9,6 @@ pub struct Key {
                   //(or kept back by a different handler so far)
                   //bit1 is used to protect against double rewrites
 }
-
 impl Key {
     pub fn new(keycode: u32) -> Key {
         Key {
@@ -21,21 +19,18 @@ impl Key {
         }
     }
 }
-
 #[derive(PartialEq, Debug)]
 pub enum Event {
     KeyPress(Key),
     KeyRelease(Key),
     TimeOut(u16),
 }
-
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum EventStatus {
     Unhandled,
     Handled,
     Ignored,
 }
-
 pub fn iter_unhandled_mut(
     events: &mut Vec<(Event, EventStatus)>,
 ) -> impl DoubleEndedIterator<Item = &mut (Event, EventStatus)> {

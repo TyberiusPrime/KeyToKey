@@ -1,31 +1,30 @@
 /// premade handlers for various occacions
-use crate::handlers::{Layer, MacroCallback, OneShot, PressReleaseMacro};
+use crate::handlers::{Layer, MacroCallback, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::{AcceptsKeycode, HandlerID, KeyCode, USBKeyOut};
 use no_std_compat::prelude::v1::*;
-
-/// Internal type for toggle_handler
-pub struct ToggleHandlerCB {
+///toggle a handler on activate
+/// do noting on deactivate
+/// probably only usefull with PressReleaseMacro
+/// used by toggle_handler()
+pub struct ActionToggleHandler {
     id: HandlerID,
 }
-
-impl MacroCallback for ToggleHandlerCB {
+impl MacroCallback for ActionToggleHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().toggle_handler(self.id);
     }
     fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {}
 }
-
 /// Toggles a handler on and off when a key is pressed
 pub fn toggle_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
-) -> Box<PressReleaseMacro<ToggleHandlerCB>> {
+) -> Box<PressReleaseMacro<ActionToggleHandler>> {
     Box::new(PressReleaseMacro::new(
         trigger.to_u32(),
-        ToggleHandlerCB { id },
+        ActionToggleHandler { id },
     ))
 }
-
 /// A layer that maps qwerty to dvorak.
 /// Don't forget to enable it, layers are off by default
 pub fn dvorak<'a>() -> Box<Layer<'a>> {
@@ -77,11 +76,10 @@ pub fn dvorak<'a>() -> Box<Layer<'a>> {
         .collect(),
     ))
 }
-
-/// Internal type for one_shot_shift
-pub struct OneShotShift {}
-
-impl MacroCallback for OneShotShift {
+/// Enable/disable shift on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+pub struct ActionShift {}
+impl MacroCallback for ActionShift {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().shift = true;
     }
@@ -89,20 +87,10 @@ impl MacroCallback for OneShotShift {
         output.state().shift = false;
     }
 }
-
-/// make the shift keys behave as a OneShot
-pub fn one_shot_shift() -> Box<OneShot<OneShotShift>> {
-    Box::new(OneShot::new(
-        KeyCode::LShift,
-        KeyCode::RShift,
-        OneShotShift {},
-    ))
-}
-
-/// Internal type for one_shot_ctrl
-pub struct OneShotCtrl {}
-
-impl MacroCallback for OneShotCtrl {
+/// Enable/disable ctrl on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+pub struct ActionCtrl {}
+impl MacroCallback for ActionCtrl {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().ctrl = true;
     }
@@ -110,16 +98,10 @@ impl MacroCallback for OneShotCtrl {
         output.state().ctrl = false;
     }
 }
-
-/// make the ctrl keys behave as a OneShot
-pub fn one_shot_ctrl() -> Box<OneShot<OneShotCtrl>> {
-    Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, OneShotCtrl {}))
-}
-
-/// Internal type for one_shot_alt
-pub struct OneShotAlt {}
-
-impl MacroCallback for OneShotAlt {
+/// Enable/disable alt on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+pub struct ActionAlt {}
+impl MacroCallback for ActionAlt {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().alt = true;
     }
@@ -127,16 +109,10 @@ impl MacroCallback for OneShotAlt {
         output.state().alt = false;
     }
 }
-
-/// make the alt keys behave as a OneShot
-pub fn one_shot_alt() -> Box<OneShot<OneShotAlt>> {
-    Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, OneShotAlt {}))
-}
-
-/// Internal type for one_shot_gui
-pub struct OneShotGui {}
-
-impl MacroCallback for OneShotGui {
+/// Enable/disable gui on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+pub struct ActionGui {}
+impl MacroCallback for ActionGui {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().gui = true;
     }
@@ -144,18 +120,12 @@ impl MacroCallback for OneShotGui {
         output.state().gui = false;
     }
 }
-
-/// make the gui/windows key behave as a OneShot
-pub fn one_shot_gui() -> Box<OneShot<OneShotGui>> {
-    Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, OneShotGui {}))
-}
-
-/// Internal type for one_shot_handler
-pub struct OneShotHandler {
+/// Enable/disable handler (layer) on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+pub struct ActionHandler {
     id: HandlerID,
 }
-
-impl MacroCallback for OneShotHandler {
+impl MacroCallback for ActionHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().enable_handler(self.id);
     }
@@ -163,15 +133,39 @@ impl MacroCallback for OneShotHandler {
         output.state().disable_handler(self.id);
     }
 }
-
+/// make the shift keys behave as a OneShot
+pub fn one_shot_shift() -> Box<OneShot<ActionShift>> {
+    Box::new(OneShot::new(
+        KeyCode::LShift,
+        KeyCode::RShift,
+        ActionShift {},
+    ))
+}
+/// make the ctrl keys behave as a OneShot
+pub fn one_shot_ctrl() -> Box<OneShot<ActionCtrl>> {
+    Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, ActionCtrl {}))
+}
+/// make the alt keys behave as a OneShot
+pub fn one_shot_alt() -> Box<OneShot<ActionAlt>> {
+    Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, ActionAlt {}))
+}
+/// make the gui/windows key behave as a OneShot
+pub fn one_shot_gui() -> Box<OneShot<ActionGui>> {
+    Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, ActionGui {}))
+}
 /// Toggle a handler (layer) based on OneShot behaviour
 pub fn one_shot_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
-) -> Box<OneShot<OneShotHandler>> {
-    Box::new(OneShot::new(trigger, KeyCode::No, OneShotHandler { id }))
+) -> Box<OneShot<ActionHandler>> {
+    Box::new(OneShot::new(trigger, KeyCode::No, ActionHandler { id }))
 }
-
+pub fn space_cadet_handler(
+    trigger: impl AcceptsKeycode,
+    id: HandlerID,
+) -> Box<SpaceCadet<ActionHandler>> {
+    Box::new(SpaceCadet::new(trigger, ActionHandler { id }))
+}
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
@@ -179,7 +173,6 @@ mod tests {
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
     use no_std_compat::prelude::v1::*;
-
     use crate::handlers::USBKeyboard;
     #[allow(unused_imports)]
     use crate::premade::{dvorak, toggle_handler};
@@ -187,7 +180,6 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-
     #[test]
     fn test_toggle_handler() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -205,7 +197,6 @@ mod tests {
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().is_handler_enabled(id));
     }
-
     #[test]
     fn test_layer_double_rewrite_dvorak() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -214,7 +205,6 @@ mod tests {
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::Q, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Quote]]);
@@ -223,7 +213,6 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::Quote], &[]]);
     }
-
     #[test]
     fn test_dvorak_brackets() {
         use crate::handlers;
@@ -233,14 +222,12 @@ mod tests {
         let dvorak_id = keyboard.add_handler(premade::dvorak());
         keyboard.output.state().enable_handler(dvorak_id);
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::LBracket, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Slash]]);
         keyboard.add_keyrelease(KeyCode::LBracket, 0);
         keyboard.handle_keys().unwrap();
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RBracket, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
@@ -249,7 +236,6 @@ mod tests {
         keyboard.handle_keys().unwrap();
         keyboard.output.clear();
     }
-
     #[test]
     fn test_oneshot_shift() {
         use crate::handlers;
@@ -258,49 +244,41 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(premade::one_shot_shift());
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
         keyboard.output.clear();
         assert!(keyboard.output.state().shift);
-
         keyboard.add_keyrelease(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //shift still set
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
         keyboard.output.clear();
         assert!(keyboard.output.state().shift);
-
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift]]);
         keyboard.output.clear();
-
         //we have not released the shift key!
         keyboard.add_keyrelease(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -308,7 +286,6 @@ mod tests {
         check_output(&keyboard, &[&[]]); //now we're good
         keyboard.output.clear();
     }
-
     #[test]
     fn test_oneshot_interaction() {
         use crate::handlers;
@@ -320,33 +297,28 @@ mod tests {
         keyboard.add_handler(premade::one_shot_ctrl());
         keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
         keyboard.output.clear();
         assert!(keyboard.output.state().shift);
-
         keyboard.add_keyrelease(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().ctrl);
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //note that the one shots always output the L variants
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         assert!(keyboard.output.state().ctrl);
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         assert!(!keyboard.output.state().is_handler_enabled(dv));
         keyboard.add_keypress(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
@@ -355,7 +327,6 @@ mod tests {
         assert!(keyboard.output.state().is_handler_enabled(dv));
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //note that the one shots always output the L variants
         keyboard.output.clear();
-
         keyboard.add_keyrelease(0xF0000u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
@@ -363,7 +334,6 @@ mod tests {
         assert!(keyboard.output.state().is_handler_enabled(dv));
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
@@ -371,16 +341,13 @@ mod tests {
         assert!(keyboard.output.state().is_handler_enabled(dv));
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl, KeyCode::Q]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
         assert!(!keyboard.output.state().ctrl);
         assert!(!keyboard.output.state().is_handler_enabled(dv));
-
         check_output(&keyboard, &[&[]]); //key is released, but shift is still set
     }
-
     #[test]
     fn test_oneshot_rapid_typing() {
         use crate::handlers;
@@ -389,37 +356,31 @@ mod tests {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(premade::one_shot_shift());
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
-
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
         keyboard.output.clear();
         assert!(keyboard.output.state().shift);
-
         keyboard.add_keyrelease(KeyCode::RShift, 50);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::A, 50);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keypress(KeyCode::B, 50);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::A, KeyCode::B]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::A, 50);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::B]]); //key is released, but shift is still set
         keyboard.output.clear();
-
         keyboard.add_keyrelease(KeyCode::A, 50);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);

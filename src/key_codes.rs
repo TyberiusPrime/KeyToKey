@@ -1,9 +1,7 @@
 use alloc::{format, string::String};
 use core::convert::{TryFrom, TryInto};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-
 pub const UNICODE_BELOW_256: u32 = 0x100000;
-
 /// usb key codes mapped into the first private region of unicode
 /// USBKeyOut must substract UNICODE_BELOW_256 to create valid u8 values
 /// to transmit
@@ -128,7 +126,6 @@ impl KeyCode {
     pub fn is_modifier(self) -> bool {
         KeyCode::LCtrl <= self && self <= KeyCode::RGui
     }
-
     /// needed to build USB reports
     pub fn as_modifier_bit(self) -> u8 {
         if self.is_modifier() {
@@ -137,13 +134,11 @@ impl KeyCode {
             0
         }
     }
-
     pub fn to_u8(self) -> u8 {
         let u = (self as u32) - UNICODE_BELOW_256;
         return u as u8;
     }
 }
-
 impl TryFrom<u8> for KeyCode {
     type Error = String;
     fn try_from(ii: u8) -> Result<KeyCode, Self::Error> {
@@ -151,13 +146,11 @@ impl TryFrom<u8> for KeyCode {
         return x.try_into();
     }
 }
-
 /// Trait for things that can be converted to a u32 keycode
 /// ie. various integers and (usb) KeyCodes themselves
 pub trait AcceptsKeycode {
     fn to_u32(&self) -> u32;
 }
-
 impl AcceptsKeycode for u32 {
     fn to_u32(&self) -> u32 {
         *self
@@ -168,13 +161,11 @@ impl AcceptsKeycode for &u32 {
         **self
     }
 }
-
 impl AcceptsKeycode for i32 {
     fn to_u32(&self) -> u32 {
         (*self) as u32
     }
 }
-
 impl AcceptsKeycode for KeyCode {
     fn to_u32(&self) -> u32 {
         let r: u32 = (*self).into();
