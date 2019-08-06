@@ -161,6 +161,8 @@ pub enum KeyCode {
     Hiragana, // 0x93,       // Keyboard LANG // 0x674
     Zenkakuhankaku, // 0x94, // Keyboard LANG5
 
+    KpLeftParen =0xb6 + UNICODE_BELOW_256,// Keypad (
+    KpRightParen,// 0xb7 // Keypad )
     // Modifiers
     LCtrl = 0xE0 + UNICODE_BELOW_256,
     LShift,
@@ -170,6 +172,28 @@ pub enum KeyCode {
     RShift,
     RAlt,
     RGui, // 0xE7
+
+    MediaPlayPause = 0xE8 + UNICODE_BELOW_256,
+    MediaStopCd,
+    MediaPrevioussong,
+    MediaNextsong,
+    MediaEjectCd,
+    MediaVolumeUp,
+    MediaVolumeDown,
+    MediaMUte,
+    MediaWww,
+    MediaBack,
+    MediaForward,
+    MediaStop,
+    MediaFind,
+    MediaScrollUp,
+    MediaScrollDown,
+    MediaEdit,
+    MediaSleep,
+    MediaCoffee,
+    MediaRefresh,
+    MediaCalc,
+
 }
 impl KeyCode {
     /// needed to build USB reports
