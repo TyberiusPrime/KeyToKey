@@ -484,7 +484,9 @@ pub enum OneShotStatus {
 /// or if the OneShot trigger is pressed again
 /// 
 /// If timeout is > 0 and the key is pressed for at least that many ms,
-/// and on_deactivate will be called upon release
+/// and on_deactivate will be called upon release. This typically is useful
+/// for graphics work where the user presses the modifiers while interacting 
+/// with the mouse
 ///
 /// OneShots have two triggers to accomidate the usual left/right modifier keys,
 /// just pass in Keycode::No if you want one trigger to be ignored

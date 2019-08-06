@@ -34,12 +34,12 @@ USBKeyboard does not limit the number of simultanious keys, but the downstream t
 to the usual 6 key rollover.
 
 Above these two handlers the implementor may place other handlers that offer  for example: 
-    * Layers (which can rewrite key codes, conditionally rewrite them based on shift status or send arbitrary strings)
-    * PressReleaseMacros (callbacks on key press / key release)
-    * StickyMacros (Tap once to activate, again to deactivate){
-    * Leader sequences (e.g. hit `leader` h e a r t to enter a heart emoji, or an arbitrary string)
-    * OneShots (Press -> activate, deactivates after next any key press - useful for modifiers or temporarily activated layers)
-    * TapDance (Count the number of taps on a key, pass the final count to a callback)
-    * SpaceCadet (Do one thing on press-and-hold, a different thing on tap. For example a shift key that also outputs a '('))
-    * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
+ * Layers (which can rewrite key codes, conditionally rewrite them based on shift status or send arbitrary strings)
+ * PressReleaseMacros (callbacks on key press / key release)
+ * StickyMacros (Tap once to activate, again to deactivate){
+ * Leader sequences (e.g. hit `leader` h e a r t to enter a heart emoji, or an arbitrary string)
+ * OneShots (Press -> activate, deactivates after next any key press - useful for modifiers or temporarily activated layers)
+ * TapDance (Count the number of taps on a key, pass the final count to a callback)
+ * SpaceCadet (Do one thing on press-and-hold, a different thing on tap. For example a shift key that also outputs a '('))
+ * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
 
