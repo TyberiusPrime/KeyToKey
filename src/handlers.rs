@@ -1,9 +1,9 @@
 use crate::key_codes::{AcceptsKeycode, KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
+use lazy_static::lazy_static;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
-use lazy_static::lazy_static;
 use spin::RwLock;
 
 use crate::USBKeyOut;
@@ -491,20 +491,27 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     }
 }
 
+#[repr(u8)]
+pub enum OneShotStatus {
+    Held,
+    HeldUsed,
+    Triggered,
+    Off,
+}
 /// A OneShot key
 /// press it, on_activate will be called,
-/// on_deactivate will be called after the next non-oneshot key release 
+/// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
-/// 
+///
 /// OneShots have two triggers to accomidate the usual left/right modifier keys,
-/// just pass in Keycode::No if you want one trigger to be ignored 
+/// just pass in Keycode::No if you want one trigger to be ignored
 /// note that the oneshots always lead to the left variant of the modifier being sent,
 /// even if they're being triggered by the right one.
 pub struct OneShot<M> {
     trigger1: u32,
     trigger2: u32,
     callbacks: M,
-    active: bool,
+    status: OneShotStatus,
 }
 
 lazy_static! {
@@ -524,7 +531,7 @@ impl<M: MacroCallback> OneShot<M> {
             trigger1: trigger1.to_u32(),
             trigger2: trigger2.to_u32(),
             callbacks,
-            active: false,
+            status: OneShotStatus::Off,
         }
     }
 }
@@ -541,21 +548,42 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                 Event::KeyPress(kc) => {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         *status = EventStatus::Handled;
-                        if self.active {
-                            self.active = false;
-                            self.callbacks.on_deactivate(output)
-                        } else {
-                            self.active = true;
-                            self.callbacks.on_activate(output)
+                        match self.status {
+                            OneShotStatus::Triggered => {
+                                self.status = OneShotStatus::Off;
+                                self.callbacks.on_deactivate(output)
+                            }
+                            OneShotStatus::Off => {
+                                self.status = OneShotStatus::Held;
+                                self.callbacks.on_activate(output)
+                            }
+                            OneShotStatus::Held | OneShotStatus::HeldUsed => {}
                         }
                     }
                 }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
+                        match self.status {
+                            OneShotStatus::Held => {
+                                self.status = OneShotStatus::Triggered;
+                            }
+
+                            OneShotStatus::HeldUsed => {
+                                self.status = OneShotStatus::Off;
+                                self.callbacks.on_deactivate(output)
+                            }
+                            _ => {}
+                        }
                         *status = EventStatus::Handled;
                     } else if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
-                        self.active = false;
-                        self.callbacks.on_deactivate(output)
+                        match self.status {
+                            OneShotStatus::Triggered => {
+                                self.status = OneShotStatus::Off;
+                                self.callbacks.on_deactivate(output)
+                            }
+                            OneShotStatus::Held => self.status = OneShotStatus::HeldUsed,
+                            _ => {}
+                        }
                     }
                 }
                 Event::TimeOut(_) => {}
@@ -1031,11 +1059,12 @@ mod tests {
             keyboard.add_keyrelease(KeyCode::A, 20);
             keyboard.handle_keys().unwrap();
             assert!(counter.read().down_counter == 2);
-            assert!(counter.read().up_counter == 2);
+            assert!(counter.read().up_counter == 1); //trigger is being held
 
-            //third release - no change
+            //third release - release trigger after other
             keyboard.add_keyrelease(trigger, 0);
             keyboard.handle_keys().unwrap();
+            dbg!(&counter);
             assert!(counter.read().down_counter == 2);
             assert!(counter.read().up_counter == 2);
             assert!(keyboard.events.is_empty());
@@ -1118,9 +1147,9 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::A, 20);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
-        assert!(counter.read().up_counter == 2);
+        assert!(counter.read().up_counter == 1); // still being held
 
-        //third release - no change
+        //third release - triggers deactivate
         keyboard.add_keyrelease(0xF0001u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(counter.read().down_counter == 2);
@@ -1154,8 +1183,6 @@ mod tests {
         assert!(counter.read().down_counter == 3);
         assert!(counter.read().up_counter == 3);
         assert!(keyboard.events.is_empty());
-
-
     }
 
     #[test]

@@ -92,7 +92,11 @@ impl MacroCallback for OneShotShift {
 
 /// make the shift keys behave as a OneShot
 pub fn one_shot_shift() -> Box<OneShot<OneShotShift>> {
-    Box::new(OneShot::new(KeyCode::LShift, KeyCode::RShift, OneShotShift {}))
+    Box::new(OneShot::new(
+        KeyCode::LShift,
+        KeyCode::RShift,
+        OneShotShift {},
+    ))
 }
 
 /// Internal type for one_shot_ctrl
@@ -129,7 +133,6 @@ pub fn one_shot_alt() -> Box<OneShot<OneShotAlt>> {
     Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, OneShotAlt {}))
 }
 
-
 /// Internal type for one_shot_gui
 pub struct OneShotGui {}
 
@@ -149,7 +152,7 @@ pub fn one_shot_gui() -> Box<OneShot<OneShotGui>> {
 
 /// Internal type for one_shot_handler
 pub struct OneShotHandler {
-    id: HandlerID
+    id: HandlerID,
 }
 
 impl MacroCallback for OneShotHandler {
@@ -162,11 +165,12 @@ impl MacroCallback for OneShotHandler {
 }
 
 /// Toggle a handler (layer) based on OneShot behaviour
-pub fn one_shot_handler(trigger: impl AcceptsKeycode, id: HandlerID) -> Box<OneShot<OneShotHandler>> {
-    Box::new(OneShot::new(trigger, KeyCode::No, OneShotHandler {id}))
+pub fn one_shot_handler(
+    trigger: impl AcceptsKeycode,
+    id: HandlerID,
+) -> Box<OneShot<OneShotHandler>> {
+    Box::new(OneShot::new(trigger, KeyCode::No, OneShotHandler { id }))
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -248,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_oneshot_shift() {
-       use crate::handlers;
+        use crate::handlers;
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -270,18 +274,44 @@ mod tests {
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
-        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //key is released, but shift is still set
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //shift still set
         keyboard.output.clear();
 
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().shift);
-        check_output(&keyboard, &[&[]]); //key is released, but shift is still set
+        check_output(&keyboard, &[&[]]);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
+        assert!(keyboard.output.state().shift);
+
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::A]]); //key is released, but shift is still set
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(keyboard.output.state().shift);
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        keyboard.output.clear();
+
+        //we have not released the shift key!
+        keyboard.add_keyrelease(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        assert!(!keyboard.output.state().shift);
+        check_output(&keyboard, &[&[]]); //now we're good
+        keyboard.output.clear();
     }
 
     #[test]
     fn test_oneshot_interaction() {
-       use crate::handlers;
+        use crate::handlers;
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -334,8 +364,6 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LCtrl]]); //key is released, but shift is still set
         keyboard.output.clear();
 
-
-
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().shift);
@@ -352,6 +380,4 @@ mod tests {
 
         check_output(&keyboard, &[&[]]); //key is released, but shift is still set
     }
-
-
 }
