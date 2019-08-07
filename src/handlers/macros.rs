@@ -110,8 +110,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
 //extern crate std;
 mod tests {
     use crate::handlers::{
-     MacroCallback, 
-        PressReleaseMacro, StickyMacro, USBKeyboard
+     PressReleaseMacro, StickyMacro, USBKeyboard
     };
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;

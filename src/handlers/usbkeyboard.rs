@@ -139,10 +139,10 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    use alloc::sync::Arc;
+    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    use spin::RwLock;
+    
 
 
 
