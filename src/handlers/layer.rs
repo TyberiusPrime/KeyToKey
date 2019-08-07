@@ -1,8 +1,8 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use no_std_compat::prelude::v1::*;
 pub enum LayerAction<'a> {
     RewriteTo(u32),
     RewriteToShifted(u32, u32),
@@ -24,7 +24,7 @@ impl Layer<'_> {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //events.iter_mut() {
             match event {

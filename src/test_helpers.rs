@@ -3,9 +3,10 @@ use crate::key_codes::KeyCode;
 use crate::{
     iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
 };
-use no_std_compat::prelude::v1::*;
 use alloc::sync::Arc;
+use no_std_compat::prelude::v1::*;
 use spin::RwLock;
+#[derive(Default)]
 pub struct KeyOutCatcher {
     keys_registered: Vec<u8>,
     pub reports: Vec<Vec<u8>>,
@@ -30,8 +31,7 @@ impl USBKeyOut for KeyOutCatcher {
         return &mut self.state;
     }
     fn send_keys(&mut self, keys: &[KeyCode]) {
-        self.reports
-            .push(keys.into_iter().map(|&x| x.to_u8()).collect());
+        self.reports.push(keys.iter().map(|&x| x.to_u8()).collect());
     }
     fn register_key(&mut self, key: KeyCode) {
         if !self.keys_registered.iter().any(|x| *x == key.to_u8()) {
@@ -70,15 +70,12 @@ impl TimeoutLogger {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for TimeoutLogger {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, _status) in iter_unhandled_mut(events) {
-            match event {
-                Event::TimeOut(ms_since_last) => {
-                    if *ms_since_last > self.min_timeout_ms {
-                        output.send_keys(&[self.keycode]);
-                    }
+            if let Event::TimeOut(ms_since_last) = event {
+                if *ms_since_last > self.min_timeout_ms {
+                    output.send_keys(&[self.keycode]);
                 }
-                _ => {}
             }
         }
     }

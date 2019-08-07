@@ -30,17 +30,18 @@ fn nibble_to_keycode(nibble: u8) -> KeyCode {
         }
     }
 }
+
 fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
-    return [
-        nibble_to_keycode(((x >> 32 - 4) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 8) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 12) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 16) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 20) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 24) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 28) & 0xf) as u8),
-        nibble_to_keycode(((x >> 32 - 32) & 0xf) as u8),
-    ];
+    [
+        nibble_to_keycode(((x >> (32 - 4)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 8)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 12)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 16)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 20)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 24)) & 0xf) as u8),
+        nibble_to_keycode(((x >> (32 - 28)) & 0xf) as u8),
+        nibble_to_keycode((x & 0xf) as u8),
+    ]
 }
 /// this handler helps you build a translation table for MatrixToStream
 /// by outputing the keycode observed as
@@ -49,7 +50,7 @@ fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
 /// keyboard after pressing a key and later sort by
 pub struct TranslationHelper {}
 impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (e, status) in iter_unhandled_mut(events) {
             *status = EventStatus::Handled;
             match e {
@@ -81,7 +82,7 @@ pub struct DebugStream<F> {
     write_callback: F,
 }
 impl<T: USBKeyOut, F: FnMut(String)> ProcessKeys<T> for DebugStream<F> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) {
         if !events.is_empty() {
             (self.write_callback)("[\n".to_string());
             for (e, status) in events.iter() {

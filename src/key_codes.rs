@@ -1,7 +1,7 @@
 use alloc::{format, string::String};
 use core::convert::{TryFrom, TryInto};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub const UNICODE_BELOW_256: u32 = 0x100000;
+pub const UNICODE_BELOW_256: u32 = 0x100_000;
 /// usb key codes mapped into the first private region of unicode
 /// USBKeyOut must substract UNICODE_BELOW_256 to create valid u8 values
 /// to transmit
@@ -216,11 +216,10 @@ impl KeyCode {
 impl TryFrom<u8> for KeyCode {
     type Error = String;
     fn try_from(ii: u8) -> Result<KeyCode, Self::Error> {
-        let x: u32 = (ii as u32) + UNICODE_BELOW_256;
+        let x: u32 = u32::from(ii) + UNICODE_BELOW_256;
         return x.try_into();
     }
 }
-
 /// KeyCodes not being used by anything by default
 /// so you're free to use these to assign macros/tapdances/leaders
 /// and what not.
@@ -354,14 +353,12 @@ impl AcceptsKeycode for KeyCode {
         r
     }
 }
-
 impl AcceptsKeycode for UserKey {
     fn to_u32(&self) -> u32 {
         let r: u32 = (*self).into();
         r
     }
 }
-
 impl AcceptsKeycode for &UserKey {
     fn to_u32(&self) -> u32 {
         let r: u32 = (**self).into();

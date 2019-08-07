@@ -1,14 +1,14 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::MacroCallback;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use no_std_compat::prelude::v1::*;
 //// The simples callback -
 /// call on_press(output: impl USBKeyOut) on key press
 /// and on_release(output) on release))
 /// trigger may be any keycode,
-/// but consider using the constants in UserKey::* 
+/// but consider using the constants in UserKey::*
 /// which is not used by either UnicodeKeyboard or UsbKeyboard
 pub struct PressReleaseMacro<M> {
     keycode: u32,
@@ -23,7 +23,7 @@ impl<M: MacroCallback> PressReleaseMacro<M> {
     }
 }
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
@@ -72,7 +72,7 @@ impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> StickyMacro<'a, T, 
 impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
     for StickyMacro<'_, T, F1, F2>
 {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
             // on press if not active -> active

@@ -1,8 +1,8 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::{MacroCallback, ProcessKeys};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use no_std_compat::prelude::v1::*;
 pub struct SpaceCadet<M> {
     trigger: u32,
     callbacks: M,
@@ -22,7 +22,7 @@ impl<M: MacroCallback> SpaceCadet<M> {
     }
 }
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for SpaceCadet<M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut initial_keypress_status: Option<EventStatus> = None;
         for (event, status) in iter_unhandled_mut(events) {
             match event {
@@ -59,20 +59,14 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for SpaceCadet<M> {
                 Event::TimeOut(_) => {}
             }
         }
-        match initial_keypress_status {
-            Some(new_status) => {
-                for (event, status) in events.iter_mut() {
-                    match event {
-                        Event::KeyPress(kc) => {
-                            if kc.keycode == self.trigger {
-                                *status = new_status;
-                            }
-                        }
-                        _ => {}
+        if let Some(new_status) = initial_keypress_status {
+            for (event, status) in events.iter_mut() {
+                if let Event::KeyPress(kc) = event {
+                    if kc.keycode == self.trigger {
+                        *status = new_status;
                     }
                 }
             }
-            None => {}
         }
     }
 }

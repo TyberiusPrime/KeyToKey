@@ -1,9 +1,9 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::{MacroCallback, ProcessKeys};
-use crate::key_codes::{AcceptsKeycode};
+use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use lazy_static::lazy_static;
+use no_std_compat::prelude::v1::*;
 use spin::RwLock;
 #[repr(u8)]
 pub enum OneShotStatus {
@@ -57,7 +57,7 @@ impl<M: MacroCallback> OneShot<M> {
     }
 }
 impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
             // on press if not active -> active
@@ -81,8 +81,7 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                             | OneShotStatus::HeldUsed
                             | OneShotStatus::TriggerUsed => {}
                         }
-                    } else {
-                        if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
+                    } else if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
                             match self.status {
                                 OneShotStatus::Triggered => {
                                     self.status = OneShotStatus::TriggerUsed
@@ -94,7 +93,6 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                                 _ => {}
                             }
                         }
-                    }
                 }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {

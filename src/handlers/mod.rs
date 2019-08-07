@@ -9,6 +9,7 @@ mod spacecadet;
 mod tapdance;
 mod unicodekeyboard;
 mod usbkeyboard;
+use crate::USBKeyOut;
 pub use autoshift::AutoShift;
 pub use layer::{Layer, LayerAction};
 pub use leader::Leader;
@@ -18,13 +19,12 @@ pub use spacecadet::SpaceCadet;
 pub use tapdance::TapDance;
 pub use unicodekeyboard::UnicodeKeyboard;
 pub use usbkeyboard::USBKeyboard;
-use crate::USBKeyOut;
 /// Handlers are defined by this trait
 ///
 /// they process the events, set their status to either Handled or Ignored
 /// (if more data is necessary), and send input to the computer via output
 pub trait ProcessKeys<T: USBKeyOut> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> ();
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T);
     /// whether this handler is enabled after add_handlers
     /// (true for most, false for Layers)
     fn default_enabled(&self) -> bool {

@@ -1,9 +1,9 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::{AcceptsKeycode, KeyCode};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use core::convert::TryInto;
+use no_std_compat::prelude::v1::*;
 pub struct AutoShift {
     shift_letters: bool,
     shift_numbers: bool,
@@ -20,19 +20,17 @@ impl AutoShift {
         }
     }
     fn should_autoshift(&self, keycode: u32) -> bool {
-        return (self.shift_letters
-            && keycode >= KeyCode::A.to_u32()
-            && keycode <= KeyCode::Z.to_u32())
+        (self.shift_letters && keycode >= KeyCode::A.to_u32() && keycode <= KeyCode::Z.to_u32())
             | (self.shift_numbers
                 && keycode >= KeyCode::Kb1.to_u32()
                 && keycode <= KeyCode::Kb0.to_u32())
             | (self.shift_special
                 && keycode >= KeyCode::Minus.to_u32()
-                && keycode <= KeyCode::Slash.to_u32());
+                && keycode <= KeyCode::Slash.to_u32())
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut presses = Vec::new();
         let mut handled = Vec::new();
         for (event, status) in iter_unhandled_mut(events) {
@@ -67,13 +65,10 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
         }
         if !handled.is_empty() {
             for (event, status) in events.iter_mut() {
-                match event {
-                    Event::KeyPress(kc) => {
+                    if let Event::KeyPress(kc) = event {
                         if handled.contains(&kc.keycode) {
                             *status = EventStatus::Handled;
                         }
-                    }
-                    _ => {}
                 }
             }
         }

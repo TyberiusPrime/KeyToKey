@@ -14,6 +14,8 @@
 #![allow(dead_code)]
 #![feature(drain_filter)]
 #![no_std]
+#![allow(clippy::needless_return, clippy::unreadable_literal)]
+
 pub mod debug_handlers;
 pub mod handlers;
 mod key_codes;
@@ -31,7 +33,7 @@ pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 /// current keyboard state.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct KeyboardState {
     pub shift: bool,
     pub ctrl: bool,
@@ -64,6 +66,11 @@ impl KeyboardState {
         self.enabled_handlers[no]
     }
 }
+
+///an identifer for an added handler
+/// to be used with Keyboard.output.enable_handler and consorts
+type HandlerID = usize;
+
 /// the main keyboard struct
 ///
 /// add handlers wit add_handler,
@@ -75,7 +82,8 @@ pub struct Keyboard<'a, T: USBKeyOut> {
     handlers: Vec<Box<dyn ProcessKeys<T> + Send + 'a>>,
     pub output: T,
 }
-type HandlerID = usize;
+
+#[allow(clippy::new_without_default)]
 impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     pub fn new(output: T) -> Keyboard<'a, T> {
         Keyboard {
@@ -182,6 +190,11 @@ pub enum UnicodeSendMode {
     // used by the tests
     Debug,
 }
+impl Default for UnicodeSendMode {
+    fn default() -> UnicodeSendMode {
+        UnicodeSendMode::Linux
+    }
+}
 /// transform hex digits to USB keycodes
 /// used by the unicode senders
 fn hex_digit_to_keycode(digit: char) -> KeyCode {
@@ -242,7 +255,7 @@ pub trait USBKeyOut {
             UnicodeSendMode::Debug => {
                 let mut buf = [0, 0, 0, 0];
                 c.encode_utf8(&mut buf);
-                self.send_keys(&[((buf[0] as u32) + UNICODE_BELOW_256).try_into().unwrap()]);
+                self.send_keys(&[(u32::from(buf[0]) + UNICODE_BELOW_256).try_into().unwrap()]);
             }
         }
     }

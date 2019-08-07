@@ -195,7 +195,7 @@ pub fn space_cadet_handler(
 /// 0
 pub struct CopyPaste {}
 impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         //step 0: on key release, remove all prior key presses.
         for (e, status) in iter_unhandled_mut(events) {
             match e {

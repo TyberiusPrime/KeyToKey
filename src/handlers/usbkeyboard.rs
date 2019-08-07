@@ -1,9 +1,9 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::{KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use core::convert::TryInto;
+use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
 /// The default bottom layer
 ///
@@ -22,7 +22,7 @@ fn is_usb_keycode(kc: u32) -> bool {
     return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
 }
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         //step 0: on key release, remove all prior key presses.
         let mut codes_to_delete: Vec<u32> = Vec::new();
         let mut modifiers_sent = sbvec![false; 4];

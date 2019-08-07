@@ -1,8 +1,8 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use no_std_compat::prelude::v1::*;
 #[derive(PartialEq)]
 enum MatchResult<'a> {
     Match(&'a str),
@@ -53,7 +53,7 @@ impl<'a> Leader<'a> {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyRelease(kc) => {
@@ -97,11 +97,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        leader::MatchResult, 
-        Leader,
-        USBKeyboard,
-    };
+    use crate::handlers::{leader::MatchResult, Leader, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]

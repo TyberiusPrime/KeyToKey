@@ -14,22 +14,22 @@ pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
     fn is_unicode_keycode(keycode: u32) -> bool {
         match keycode {
-            0x100000..=0x1000FF => false, //these are the usb codes
             0xF0000..=0xFFFFD => false,   //unicode private character range A
+            0x100000..=0x1000FE => false, //these are the usb codes
             0x1000FF..=0x10FFFD => false, //unicode private character range b (minus those we use for codes < 256)
             _ => true,
         }
     }
     fn keycode_to_unicode(keycode: u32) -> u32 {
-        if keycode < 0x100000 {
+        if keycode < 0x100_000 {
             keycode
         } else {
-            keycode - 0x100000
+            keycode - 0x100_000
         }
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
