@@ -235,16 +235,16 @@ mod tests {
     fn test_toggle_handler() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let id = keyboard.add_handler(Box::new(crate::handlers::UnicodeKeyboard {}));
-        let tid = keyboard.add_handler(toggle_handler(999, id));
+        let tid = keyboard.add_handler(toggle_handler(0xF0100u32, id));
         assert!(keyboard.output.state().is_handler_enabled(id));
         assert!(keyboard.output.state().is_handler_enabled(tid));
-        keyboard.add_keypress(999, 0);
+        keyboard.add_keypress(0xF0100u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().is_handler_enabled(id));
-        keyboard.add_keyrelease(999, 1);
+        keyboard.add_keyrelease(0xF0100u32, 1);
         keyboard.handle_keys().unwrap();
         assert!(!keyboard.output.state().is_handler_enabled(id));
-        keyboard.add_keypress(999, 0);
+        keyboard.add_keypress(0xF0100u32, 0);
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().is_handler_enabled(id));
     }

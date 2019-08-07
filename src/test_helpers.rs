@@ -1,8 +1,14 @@
+use no_std_compat::prelude::v1::*;
 use crate::key_codes::KeyCode;
 use crate::{
     iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
 };
-use no_std_compat::prelude::v1::*;
+use crate::handlers::MacroCallback;
+
+use alloc::sync::Arc;
+use spin::RwLock;
+
+
 pub struct KeyOutCatcher {
     keys_registered: Vec<u8>,
     pub reports: Vec<Vec<u8>>,
@@ -78,5 +84,52 @@ impl<T: USBKeyOut> ProcessKeys<T> for TimeoutLogger {
                 _ => {}
             }
         }
+    }
+}
+
+    #[derive(Debug)]
+    pub struct PressCounter {
+        pub down_counter: u8,
+        pub up_counter: u8,
+    }
+    impl MacroCallback for Arc<RwLock<PressCounter>> {
+        fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+            self.write().down_counter += 1;
+            output.send_keys(&[KeyCode::H]);
+        }
+        fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+            self.write().up_counter += 1;
+            output.send_keys(&[KeyCode::I]);
+        }
+    }
+    impl MacroCallback for PressCounter {
+        fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+            self.down_counter += 1;
+            output.send_keys(&[KeyCode::H]);
+        }
+        fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+            self.up_counter += 1;
+            output.send_keys(&[KeyCode::I]);
+        }
+    }
+
+
+
+#[cfg(test)]
+pub struct Debugger {
+    s: String,
+}
+
+#[cfg(test)]
+impl Debugger {
+    fn new(s: String) -> Debugger {
+        Debugger { s }
+    }
+}
+
+#[cfg(test)]
+impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
+        println!("{}, {:?}", self.s, events);
     }
 }
