@@ -1,7 +1,7 @@
-use no_std_compat::prelude::v1::*;
 use crate::handlers::ProcessKeys;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use no_std_compat::prelude::v1::*;
 /// This processor sends unicode 'characters'
 /// just map your keys to unicode 'code points'
 /// sending happens on keyrelease - no key repeat

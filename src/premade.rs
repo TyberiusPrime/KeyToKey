@@ -135,52 +135,58 @@ impl MacroCallback for ActionHandler {
     }
 }
 /// make the shift keys behave as a OneShot
-pub fn one_shot_shift(timeout: u16) -> Box<OneShot<ActionShift>> {
+pub fn one_shot_shift(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionShift>> {
     Box::new(OneShot::new(
         KeyCode::LShift,
         KeyCode::RShift,
         ActionShift {},
-        timeout,
+        held_timeout,
+        released_timeout,
     ))
 }
 /// make the ctrl keys behave as a OneShot
-pub fn one_shot_ctrl(timeout: u16) -> Box<OneShot<ActionCtrl>> {
+pub fn one_shot_ctrl(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionCtrl>> {
     Box::new(OneShot::new(
         KeyCode::LCtrl,
         KeyCode::RCtrl,
         ActionCtrl {},
-        timeout,
+        held_timeout,
+        released_timeout,
     ))
 }
 /// make the alt keys behave as a OneShot
-pub fn one_shot_alt(timeout: u16) -> Box<OneShot<ActionAlt>> {
+pub fn one_shot_alt(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionAlt>> {
     Box::new(OneShot::new(
         KeyCode::LAlt,
         KeyCode::RAlt,
         ActionAlt {},
-        timeout,
+        held_timeout,
+        released_timeout,
     ))
 }
 /// make the gui/windows key behave as a OneShot
-pub fn one_shot_gui(timeout: u16) -> Box<OneShot<ActionGui>> {
+pub fn one_shot_gui(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionGui>> {
     Box::new(OneShot::new(
         KeyCode::LGui,
         KeyCode::RGui,
         ActionGui {},
-        timeout,
+        held_timeout,
+        released_timeout,
     ))
 }
 /// Toggle a handler (layer) based on OneShot behaviour
 pub fn one_shot_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
-    timeout: u16,
+    held_timeout: u16,
+    released_timeout: u16,
 ) -> Box<OneShot<ActionHandler>> {
     Box::new(OneShot::new(
         trigger,
         KeyCode::No,
         ActionHandler { id },
-        timeout,
+        held_timeout,
+        released_timeout,
     ))
 }
 pub fn space_cadet_handler(
@@ -308,7 +314,7 @@ mod tests {
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        keyboard.add_handler(premade::one_shot_shift(0));
+        keyboard.add_handler(premade::one_shot_shift(0, 0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -359,9 +365,9 @@ mod tests {
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let dv = keyboard.add_handler(premade::dvorak());
-        keyboard.add_handler(premade::one_shot_shift(0));
-        keyboard.add_handler(premade::one_shot_ctrl(0));
-        keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv, 0));
+        keyboard.add_handler(premade::one_shot_shift(0, 0));
+        keyboard.add_handler(premade::one_shot_ctrl(0, 0));
+        keyboard.add_handler(premade::one_shot_handler(0xF0000u32, dv, 0, 0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -420,7 +426,7 @@ mod tests {
         //use crate::debug_handlers;
         use crate::premade;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        keyboard.add_handler(premade::one_shot_shift(0));
+        keyboard.add_handler(premade::one_shot_shift(0, 0));
         keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
@@ -452,5 +458,37 @@ mod tests {
         assert!(!keyboard.output.state().shift);
         check_output(&keyboard, &[&[KeyCode::B]]); //key is released, but shift is still set
         keyboard.output.clear();
+    }
+    #[test]
+    fn test_oneshot_released_timeout() {
+        use crate::handlers;
+        //use crate::debug_handlers;
+        use crate::premade;
+
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(premade::one_shot_shift(0, 1000));
+        keyboard.add_handler(Box::new(handlers::USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
+        assert!(keyboard.output.state().shift);
+
+        keyboard.add_timeout(1000);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
+        assert!(keyboard.output.state().shift);
+
+        keyboard.add_keyrelease(KeyCode::RShift, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]); //note that the one shots always output the L variants
+        keyboard.output.clear();
+
+        keyboard.add_timeout(1000);
+        keyboard.handle_keys().unwrap();
+        assert!(!keyboard.output.state().shift);
+        check_output(&keyboard, &[&[]]); //note that the one shots always output the L variants
     }
 }

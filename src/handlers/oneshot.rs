@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use no_std_compat::prelude::v1::*;
 use spin::RwLock;
 #[repr(u8)]
+#[derive(Debug)]
 pub enum OneShotStatus {
     Held,
     HeldUsed,
@@ -18,10 +19,13 @@ pub enum OneShotStatus {
 /// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
 ///
-/// If timeout is > 0 and the key is pressed for at least that many ms,
+/// If held_timeout is > 0 and the key is pressed for at least that many ms,
 /// and on_deactivate will be called upon release. This typically is useful
 /// for graphics work where the user presses the modifiers while interacting
 /// with the mouse
+///
+/// You may also define a released_timeout - after this time, without
+/// a different keypress, the OneShot will also deactivate
 ///
 /// OneShots have two triggers to accomidate the usual left/right modifier keys,
 /// just pass in Keycode::No if you want one trigger to be ignored
@@ -32,7 +36,8 @@ pub struct OneShot<M> {
     trigger2: u32,
     callbacks: M,
     status: OneShotStatus,
-    timeout: u16,
+    held_timeout: u16,
+    released_timeout: u16,
 }
 lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
@@ -43,7 +48,8 @@ impl<M: MacroCallback> OneShot<M> {
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
         callbacks: M,
-        timeout: u16,
+        held_timeout: u16,
+        released_timeout: u16,
     ) -> OneShot<M> {
         ONESHOT_TRIGGERS.write().push(trigger1.to_u32());
         ONESHOT_TRIGGERS.write().push(trigger2.to_u32());
@@ -52,7 +58,8 @@ impl<M: MacroCallback> OneShot<M> {
             trigger2: trigger2.to_u32(),
             callbacks,
             status: OneShotStatus::Off,
-            timeout,
+            held_timeout,
+            released_timeout,
         }
     }
 }
@@ -82,23 +89,21 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                             | OneShotStatus::TriggerUsed => {}
                         }
                     } else if !ONESHOT_TRIGGERS.read().contains(&kc.keycode) {
-                            match self.status {
-                                OneShotStatus::Triggered => {
-                                    self.status = OneShotStatus::TriggerUsed
-                                }
-                                OneShotStatus::TriggerUsed => {
-                                    self.status = OneShotStatus::Off;
-                                    self.callbacks.on_deactivate(output)
-                                }
-                                _ => {}
+                        match self.status {
+                            OneShotStatus::Triggered => self.status = OneShotStatus::TriggerUsed,
+                            OneShotStatus::TriggerUsed => {
+                                self.status = OneShotStatus::Off;
+                                self.callbacks.on_deactivate(output)
                             }
+                            _ => {}
                         }
+                    }
                 }
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.trigger1 || kc.keycode == self.trigger2 {
                         match self.status {
                             OneShotStatus::Held => {
-                                if self.timeout > 0 && kc.ms_since_last > self.timeout {
+                                if self.held_timeout > 0 && kc.ms_since_last > self.held_timeout {
                                     self.status = OneShotStatus::Off;
                                     self.callbacks.on_deactivate(output)
                                 } else {
@@ -124,7 +129,14 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
                         }
                     }
                 }
-                Event::TimeOut(_) => {}
+                Event::TimeOut(ms) => {
+                    if let OneShotStatus::Triggered = self.status {
+                        if self.released_timeout > 0 && *ms >= self.released_timeout {
+                            self.status = OneShotStatus::Off;
+                            self.callbacks.on_deactivate(output)
+                        }
+                    }
+                }
             }
         }
     }
@@ -152,7 +164,7 @@ mod tests {
             down_counter: 0,
             up_counter: 0,
         }));
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), 0, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -316,7 +328,7 @@ mod tests {
             up_counter: 0,
         }));
         let timeout = 1000;
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), timeout);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), timeout, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));

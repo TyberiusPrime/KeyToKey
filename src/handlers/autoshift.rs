@@ -65,10 +65,10 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
         }
         if !handled.is_empty() {
             for (event, status) in events.iter_mut() {
-                    if let Event::KeyPress(kc) = event {
-                        if handled.contains(&kc.keycode) {
-                            *status = EventStatus::Handled;
-                        }
+                if let Event::KeyPress(kc) = event {
+                    if handled.contains(&kc.keycode) {
+                        *status = EventStatus::Handled;
+                    }
                 }
             }
         }

@@ -30,7 +30,6 @@ fn nibble_to_keycode(nibble: u8) -> KeyCode {
         }
     }
 }
-
 fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
     [
         nibble_to_keycode(((x >> (32 - 4)) & 0xf) as u8),
