@@ -1,6 +1,6 @@
 //todo:
 // shift remaps on layers (ie. disassociate the premade shift-combos) testing
-// oneshot deactivate if released after x seconds 
+// oneshot deactivate if released after x seconds
 // leader does not work
 // space cadet does not work
 // combos
@@ -25,7 +25,7 @@ extern crate no_std_compat;
 extern crate spin;
 pub use crate::handlers::ProcessKeys;
 use crate::key_codes::UNICODE_BELOW_256;
-pub use crate::key_codes::{AcceptsKeycode, KeyCode};
+pub use crate::key_codes::{AcceptsKeycode, KeyCode, UserKey};
 use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
@@ -279,7 +279,6 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
     let keycode: KeyCode = keycode.try_into().unwrap();
     keycode
 }
-
 //so the tests 'just work'.
 #[cfg(test)]
 #[macro_use]

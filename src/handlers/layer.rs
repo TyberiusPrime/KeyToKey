@@ -1,11 +1,8 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::handlers::ProcessKeys;
-use crate::USBKeyOut;
+use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::key_codes::{AcceptsKeycode};
-
-
+use crate::USBKeyOut;
 pub enum LayerAction<'a> {
     RewriteTo(u32),
     RewriteToShifted(u32, u32),
@@ -28,7 +25,8 @@ impl Layer<'_> {
 }
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
-        for (event, status) in iter_unhandled_mut(events){//events.iter_mut() {
+        for (event, status) in iter_unhandled_mut(events) {
+            //events.iter_mut() {
             match event {
                 Event::KeyRelease(kc) => {
                     for (from, to) in self.rewrites.iter() {
@@ -99,15 +97,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
         false
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        Layer, LayerAction,
-        USBKeyboard
-    };
+    use crate::handlers::{Layer, LayerAction, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -116,10 +110,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
     #[test]
     fn test_layer_rewrite() {
         let l = Layer::new(vec![(
@@ -234,7 +226,4 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B]]);
     }
-
-
 }
-

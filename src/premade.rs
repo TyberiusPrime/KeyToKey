@@ -1,7 +1,7 @@
 /// premade handlers for various occacions
 use crate::handlers::{Layer, MacroCallback, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::{AcceptsKeycode, HandlerID, KeyCode, USBKeyOut, ProcessKeys, };
+use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
 use no_std_compat::prelude::v1::*;
 ///toggle a handler on activate
 /// do noting on deactivate
@@ -140,28 +140,48 @@ pub fn one_shot_shift(timeout: u16) -> Box<OneShot<ActionShift>> {
         KeyCode::LShift,
         KeyCode::RShift,
         ActionShift {},
-        timeout
+        timeout,
     ))
 }
 /// make the ctrl keys behave as a OneShot
 pub fn one_shot_ctrl(timeout: u16) -> Box<OneShot<ActionCtrl>> {
-    Box::new(OneShot::new(KeyCode::LCtrl, KeyCode::RCtrl, ActionCtrl {}, timeout))
+    Box::new(OneShot::new(
+        KeyCode::LCtrl,
+        KeyCode::RCtrl,
+        ActionCtrl {},
+        timeout,
+    ))
 }
 /// make the alt keys behave as a OneShot
 pub fn one_shot_alt(timeout: u16) -> Box<OneShot<ActionAlt>> {
-    Box::new(OneShot::new(KeyCode::LAlt, KeyCode::RAlt, ActionAlt {}, timeout))
+    Box::new(OneShot::new(
+        KeyCode::LAlt,
+        KeyCode::RAlt,
+        ActionAlt {},
+        timeout,
+    ))
 }
 /// make the gui/windows key behave as a OneShot
 pub fn one_shot_gui(timeout: u16) -> Box<OneShot<ActionGui>> {
-    Box::new(OneShot::new(KeyCode::LGui, KeyCode::RGui, ActionGui {}, timeout))
+    Box::new(OneShot::new(
+        KeyCode::LGui,
+        KeyCode::RGui,
+        ActionGui {},
+        timeout,
+    ))
 }
 /// Toggle a handler (layer) based on OneShot behaviour
 pub fn one_shot_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
-    timeout: u16
+    timeout: u16,
 ) -> Box<OneShot<ActionHandler>> {
-    Box::new(OneShot::new(trigger, KeyCode::No, ActionHandler { id }, timeout))
+    Box::new(OneShot::new(
+        trigger,
+        KeyCode::No,
+        ActionHandler { id },
+        timeout,
+    ))
 }
 pub fn space_cadet_handler(
     trigger: impl AcceptsKeycode,
@@ -169,54 +189,49 @@ pub fn space_cadet_handler(
 ) -> Box<SpaceCadet<ActionHandler>> {
     Box::new(SpaceCadet::new(trigger, ActionHandler { id }))
 }
-
-
-/// Handler for turing Copy/Paste/Cut Keycodes into 'universal' 
-/// Ctrl-Insert, Shift-insert, shift-delete keystrokes 
+/// Handler for turing Copy/Paste/Cut Keycodes into 'universal'
+/// Ctrl-Insert, Shift-insert, shift-delete keystrokes
 /// for dedicated copy paste keys
 /// 0
-pub struct CopyPaste  {}
-
+pub struct CopyPaste {}
 impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
-       for (e, status) in iter_unhandled_mut(events) {
-           match e {
-               Event::KeyPress(kc)=> {
-                   if kc.keycode == KeyCode::Copy.into() {
-                       output.send_keys(&[KeyCode::LCtrl, KeyCode::Insert]);
-                       output.send_empty();
-                       *status = EventStatus::Handled;
-                   } if kc.keycode == KeyCode::Paste.into() {
-                       output.send_keys(&[KeyCode::LShift, KeyCode::Insert]);
-                       output.send_empty();
-                       *status = EventStatus::Handled;
-                   } if kc.keycode == KeyCode::Cut.into() {
-                       output.send_keys(&[KeyCode::LShift, KeyCode::Delete]);
-                       output.send_empty();
-                       *status = EventStatus::Handled;
-                   }
-               },
-               Event::KeyRelease(kc)  =>{
-                   if kc.keycode == KeyCode::Copy.into() {
-                       *status = EventStatus::Handled;
-                   } if kc.keycode == KeyCode::Paste.into() {
-                       *status = EventStatus::Handled;
-                   } if kc.keycode == KeyCode::Cut.into() {
-                       *status = EventStatus::Handled;
-                   }
-               }
-               _ => {}
-           }
-
-
-           }
+        for (e, status) in iter_unhandled_mut(events) {
+            match e {
+                Event::KeyPress(kc) => {
+                    if kc.keycode == KeyCode::Copy.into() {
+                        output.send_keys(&[KeyCode::LCtrl, KeyCode::Insert]);
+                        output.send_empty();
+                        *status = EventStatus::Handled;
+                    }
+                    if kc.keycode == KeyCode::Paste.into() {
+                        output.send_keys(&[KeyCode::LShift, KeyCode::Insert]);
+                        output.send_empty();
+                        *status = EventStatus::Handled;
+                    }
+                    if kc.keycode == KeyCode::Cut.into() {
+                        output.send_keys(&[KeyCode::LShift, KeyCode::Delete]);
+                        output.send_empty();
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::KeyRelease(kc) => {
+                    if kc.keycode == KeyCode::Copy.into() {
+                        *status = EventStatus::Handled;
+                    }
+                    if kc.keycode == KeyCode::Paste.into() {
+                        *status = EventStatus::Handled;
+                    }
+                    if kc.keycode == KeyCode::Cut.into() {
+                        *status = EventStatus::Handled;
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }
-    
-
-
-
 #[cfg(test)]
 mod tests {
     use crate::handlers::USBKeyboard;

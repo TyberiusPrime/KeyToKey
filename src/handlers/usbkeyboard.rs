@@ -1,12 +1,10 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::handlers::ProcessKeys;
-use crate::USBKeyOut;
-use crate::key_codes::{UNICODE_BELOW_256, KeyCode};
+use crate::key_codes::{KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use smallbitvec::sbvec; 
+use crate::USBKeyOut;
 use core::convert::TryInto;
-
+use smallbitvec::sbvec;
 /// The default bottom layer
 ///
 /// this simulates a bog standard regular USB
@@ -19,12 +17,10 @@ impl USBKeyboard {
     pub fn new() -> USBKeyboard {
         USBKeyboard {}
     }
-
 }
 fn is_usb_keycode(kc: u32) -> bool {
     return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         //step 0: on key release, remove all prior key presses.
@@ -123,14 +119,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
         output.send_registered();
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        USBKeyboard
-    };
+    use crate::handlers::USBKeyboard;
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -139,13 +132,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
-
-
-
     #[test]
     fn test_usbkeyboard_single_key() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -188,7 +176,6 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         assert!(keyboard.events.is_empty());
     }
-
     #[test]
     fn test_panic_on_unhandled() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -196,7 +183,6 @@ mod tests {
         keyboard.add_keypress(0xF0000u32, 0);
         assert!(keyboard.handle_keys().is_err());
     }
-
     #[test]
     fn test_modifiers_add_left_keycodes() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -419,7 +405,6 @@ mod tests {
         assert!(!keyboard.output.state().gui);
         keyboard.output.clear();
     }
-
     #[test]
     fn test_unshift() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -475,8 +460,4 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift], &[], &[KeyCode::A]]);
     }
-
-
-
-
 }

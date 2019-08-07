@@ -1,10 +1,8 @@
 use no_std_compat::prelude::v1::*;
-
-use crate::handlers::{ProcessKeys, MacroCallback};
-use crate::USBKeyOut;
+use crate::handlers::{MacroCallback, ProcessKeys};
+use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::key_codes::{AcceptsKeycode};
-
+use crate::USBKeyOut;
 pub struct SpaceCadet<M> {
     trigger: u32,
     callbacks: M,
@@ -78,14 +76,11 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for SpaceCadet<M> {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        SpaceCadet, USBKeyboard
-    };
+    use crate::handlers::{SpaceCadet, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -98,7 +93,6 @@ mod tests {
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     use spin::RwLock;
-
     #[test]
     fn test_space_cadet() {
         let counter = Arc::new(RwLock::new(PressCounter {
@@ -142,5 +136,4 @@ mod tests {
         assert!(counter.read().up_counter == 1);
         keyboard.output.clear();
     }
-
 }

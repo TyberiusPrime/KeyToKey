@@ -1,11 +1,9 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::handlers::ProcessKeys;
-use crate::USBKeyOut;
-use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::key_codes::{AcceptsKeycode, KeyCode};
+use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::USBKeyOut;
 use core::convert::TryInto;
-
 pub struct AutoShift {
     shift_letters: bool,
     shift_numbers: bool,
@@ -85,10 +83,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        AutoShift, 
-        USBKeyboard,
-    };
+    use crate::handlers::{AutoShift, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -97,12 +92,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
-
-
     #[test]
     fn test_autoshift() {
         let threshold = 200;
@@ -163,6 +154,4 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::X]]);
         keyboard.output.clear()
     }
-
-
 }

@@ -1,19 +1,14 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::handlers::ProcessKeys;
-use crate::USBKeyOut;
-use crate::key_codes::{AcceptsKeycode};
+use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-
-
+use crate::USBKeyOut;
 #[derive(PartialEq)]
 enum MatchResult<'a> {
     Match(&'a str),
     WontMatch,
     NeedsMoreInput,
 }
-
-
 pub struct Leader<'a> {
     trigger: u32,
     mappings: Vec<(Vec<u32>, &'a str)>,
@@ -98,14 +93,14 @@ impl<T: USBKeyOut> ProcessKeys<T> for Leader<'_> {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
     use crate::handlers::{
-        AutoShift, Layer, LayerAction, Leader, MacroCallback, leader::MatchResult, OneShot,
-        PressReleaseMacro, SpaceCadet, StickyMacro, TapDance, USBKeyboard, UnicodeKeyboard,
+        leader::MatchResult, 
+        Leader,
+        USBKeyboard,
     };
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
@@ -115,13 +110,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
-
-
-  
     #[test]
     fn test_leader() {
         use crate::key_codes::KeyCode::*;
@@ -205,5 +195,4 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[69u8.try_into().unwrap()], &[]]);
     }
-
 }

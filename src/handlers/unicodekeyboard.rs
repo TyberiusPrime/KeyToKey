@@ -1,16 +1,15 @@
 use no_std_compat::prelude::v1::*;
-
 use crate::handlers::ProcessKeys;
-use crate::USBKeyOut;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-
-
+use crate::USBKeyOut;
 /// This processor sends unicode 'characters'
-/// just map your keys to unicode 'characters'
+/// just map your keys to unicode 'code points'
 /// sending happens on keyrelease - no key repeat
 ///
-/// use the range 0xF0100..=0xFFFFD, or 0x1000FF..=0x10FFFD
-///  for custom key codes that are note processed
+/// the private ranges of unicode are not send,
+/// but some of them are intpreted as USB-Keycodes
+/// by UsbKeyboard.
+/// Use UserKey::* for totally custom keys
 pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
     fn is_unicode_keycode(keycode: u32) -> bool {
@@ -29,7 +28,6 @@ impl UnicodeKeyboard {
         }
     }
 }
-
 impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> () {
         for (event, status) in iter_unhandled_mut(events) {
@@ -55,14 +53,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        USBKeyboard, UnicodeKeyboard,
-    };
+    use crate::handlers::{USBKeyboard, UnicodeKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -71,12 +66,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
-
-
     #[test]
     fn test_unicode_keyboard_linux() {
         use crate::key_codes::KeyCode::*;
@@ -151,6 +142,4 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         assert!(keyboard.events.is_empty());
     }
-
-
 }

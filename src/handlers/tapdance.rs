@@ -1,10 +1,8 @@
 use no_std_compat::prelude::v1::*;
-
-use crate::handlers::{ProcessKeys};
-use crate::USBKeyOut;
+use crate::handlers::ProcessKeys;
+use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::key_codes::{AcceptsKeycode};
-
+use crate::USBKeyOut;
 pub struct TapDance<'a, T, F> {
     trigger: u32,
     tap_count: u8,
@@ -54,14 +52,11 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
         }
     }
 }
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{
-        TapDance, USBKeyboard
-    };
+    use crate::handlers::{TapDance, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -70,10 +65,8 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
-    
     #[test]
     fn test_tapdance() {
         let l = TapDance::new(
@@ -164,7 +157,4 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::C], &[]]);
     }
-
-
-
 }
