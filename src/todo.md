@@ -1,7 +1,5 @@
 Open tasks:
 
- * include physical key id in Key and use it to discover matching
-   pairs - necessary to correctly handle layer on/off while a key is depressed
  * debug spacecadet
   rework leader
  * debug&rework tapdance
@@ -9,6 +7,7 @@ Open tasks:
  * Layers: Allow passing triggers - Unfortunatly, you can't just use Trigger,
    since the impl USBKeyOut means it's generic, and turning
    it into a Trigger<T: USBKeyOut>  bubbles the output type into the LayerAction, then into the Layer, and then we run into some Sync/Send issue that I can't fathom
+* Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
 
 
 Sort: 
@@ -29,3 +28,4 @@ Done
  * use smallbitvec for the enablers
  * sticky macro to trait interface
  * TapAndLongTap functionality
+ * correctly handle layer on/off while a key is depressed

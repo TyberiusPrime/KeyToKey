@@ -150,6 +150,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     pub fn add_keypress<X: AcceptsKeycode>(&mut self, keycode: X, ms_since_last: u16) {
         let e = Key {
             keycode: keycode.to_u32(),
+            original_keycode: keycode.to_u32(),
             ms_since_last,
             running_number: self.running_number,
             flag: 0,
@@ -162,6 +163,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     pub fn add_keyrelease<X: AcceptsKeycode>(&mut self, keycode: X, ms_since_last: u16) {
         let e = Key {
             keycode: keycode.to_u32(),
+            original_keycode: keycode.to_u32(),
             ms_since_last,
             running_number: self.running_number,
             flag: 0,

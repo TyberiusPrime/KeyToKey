@@ -2,6 +2,7 @@ use no_std_compat::prelude::v1::*;
 #[derive(PartialEq, Debug)]
 pub struct Key {
     pub keycode: u32,
+    pub original_keycode: u32, //used to match key press/release pairs
     pub ms_since_last: u16,
     pub running_number: u8,
     pub flag: u8, //Todo: express this better
@@ -13,6 +14,7 @@ impl Key {
     pub fn new(keycode: u32) -> Key {
         Key {
             keycode,
+            original_keycode: keycode,
             ms_since_last: 0,
             running_number: 0,
             flag: 0,

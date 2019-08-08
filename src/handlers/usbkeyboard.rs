@@ -33,8 +33,8 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             match e {
                 Event::KeyRelease(kc) => {
                     if is_usb_keycode(kc.keycode) {
-                        if !codes_to_delete.contains(&kc.keycode) {
-                            codes_to_delete.push(kc.keycode);
+                        if !codes_to_delete.contains(&kc.original_keycode) {
+                            codes_to_delete.push(kc.original_keycode);
                         }
                         *status = EventStatus::Handled;
                     }
@@ -57,7 +57,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                 }
                 Event::KeyPress(kc) => {
                     let mut send = false;
-                    if codes_to_delete.contains(&kc.keycode) {
+                    if codes_to_delete.contains(&kc.original_keycode) {
                         *status = EventStatus::Handled;
                         if kc.flag == 0 {
                             //we have never send this before
