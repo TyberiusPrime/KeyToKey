@@ -2,6 +2,8 @@ use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
+use crate::Modifier::*;
+
 use no_std_compat::prelude::v1::*;
 pub enum LayerAction<'a> {
     RewriteTo(u32),
@@ -41,7 +43,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                 }
                                 LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
                                     if (kc.flag & 2) == 0 {
-                                        if output.state().shift {
+                                        if output.state().modifier(Shift) {
                                             kc.keycode = *to_shifted_keycode;
                                         } else {
                                             kc.keycode = *to_keycode;
@@ -72,7 +74,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                 }
                                 LayerAction::RewriteToShifted(to_keycode, to_shifted_keycode) => {
                                     if (kc.flag & 2) == 0 {
-                                        if output.state().shift {
+                                        if output.state().modifier(Shift) {
                                             kc.keycode = *to_shifted_keycode;
                                         } else {
                                             kc.keycode = *to_keycode;
@@ -110,6 +112,7 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
+    use crate::Modifier::*;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]
@@ -181,7 +184,7 @@ mod tests {
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
         keyboard.output.state().enable_handler(layer_id);
-        assert!(!keyboard.output.state().shift);
+        assert!(!keyboard.output.state().modifier(Shift));
         keyboard.add_keypress(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         keyboard.add_keyrelease(KeyCode::A, 0);
@@ -197,7 +200,7 @@ mod tests {
             &keyboard,
             &[&[KeyCode::LShift], &[KeyCode::LShift, KeyCode::Z]],
         );
-        assert!(keyboard.output.state().shift);
+        assert!(keyboard.output.state().modifier(Shift));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
@@ -206,7 +209,7 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         dbg!(keyboard.output.state());
-        assert!(!(keyboard.output.state().shift));
+        assert!(!(keyboard.output.state().modifier(Shift)));
         check_output(&keyboard, &[&[]]);
     }
     #[test]

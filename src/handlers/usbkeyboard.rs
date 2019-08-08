@@ -5,6 +5,8 @@ use crate::USBKeyOut;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
+use crate::Modifier::*;
+
 /// The default bottom layer
 ///
 /// this simulates a bog standard regular USB
@@ -37,20 +39,20 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         *status = EventStatus::Handled;
                     }
                     if kc.keycode == KeyCode::LShift.into() || kc.keycode == KeyCode::RShift.into()
-                    {
-                        output.state().shift = false;
-                    } else if kc.keycode == KeyCode::LAlt.into()
-                        || kc.keycode == KeyCode::RAlt.into()
-                    {
-                        output.state().alt = false;
+                {
+                        output.state().set_modifier(Shift, false);
                     } else if kc.keycode == KeyCode::LCtrl.into()
                         || kc.keycode == KeyCode::RCtrl.into()
                     {
-                        output.state().ctrl = false;
+                        output.state().set_modifier(Ctrl, false);
+                    } else if kc.keycode == KeyCode::LAlt.into()
+                        || kc.keycode == KeyCode::RAlt.into()
+                    {
+                        output.state().set_modifier(Alt, false);
                     } else if kc.keycode == KeyCode::LGui.into()
                         || kc.keycode == KeyCode::RGui.into()
                     {
-                        output.state().gui = false;
+                        output.state().set_modifier(Gui, false);
                     }
                 }
                 Event::KeyPress(kc) => {
@@ -66,22 +68,23 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         if kc.keycode == KeyCode::LShift.into()
                             || kc.keycode == KeyCode::RShift.into()
                         {
-                            output.state().shift = true;
+                            output.state().set_modifier(Shift, true);
                             modifiers_sent.set(0, true);
-                        } else if kc.keycode == KeyCode::LAlt.into()
-                            || kc.keycode == KeyCode::RAlt.into()
-                        {
-                            output.state().alt = true;
-                            modifiers_sent.set(1, true);
                         } else if kc.keycode == KeyCode::LCtrl.into()
                             || kc.keycode == KeyCode::RCtrl.into()
                         {
-                            output.state().ctrl = true;
+                            output.state().set_modifier(Ctrl, true);
+                            modifiers_sent.set(1, true);
+                        } else if kc.keycode == KeyCode::LAlt.into()
+                            || kc.keycode == KeyCode::RAlt.into()
+                        {
+                            output.state().set_modifier(Alt, true);
                             modifiers_sent.set(2, true);
+
                         } else if kc.keycode == KeyCode::LGui.into()
                             || kc.keycode == KeyCode::RGui.into()
                         {
-                            output.state().gui = true;
+                            output.state().set_modifier(Gui, true);
                             modifiers_sent.set(3, true);
                         }
                     }
@@ -104,16 +107,16 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                 Event::TimeOut(_) => {}
             }
         }
-        if output.state().shift && !modifiers_sent[0] {
+        if output.state().modifier(Shift) && !modifiers_sent[0] {
             output.register_key(KeyCode::LShift);
         }
-        if output.state().alt && !modifiers_sent[1] {
-            output.register_key(KeyCode::LAlt);
-        }
-        if output.state().ctrl && !modifiers_sent[2] {
+        if output.state().modifier(Ctrl) && !modifiers_sent[1] {
             output.register_key(KeyCode::LCtrl);
         }
-        if output.state().gui && !modifiers_sent[3] {
+        if output.state().modifier(Alt) && !modifiers_sent[2] {
+            output.register_key(KeyCode::LAlt);
+        }
+        if output.state().modifier(Gui) && !modifiers_sent[3] {
             output.register_key(KeyCode::LGui);
         }
         output.send_registered();
@@ -132,6 +135,7 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
+    use crate::Modifier::*;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]
@@ -195,7 +199,7 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
-        keyboard.output.state().shift = true;
+        keyboard.output.state().set_modifier(Shift, true);
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LShift]]);
@@ -204,8 +208,8 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
         keyboard.output.clear();
-        keyboard.output.state().shift = false;
-        keyboard.output.state().ctrl = true;
+        keyboard.output.state().set_modifier(Shift, false);
+        keyboard.output.state().set_modifier(Ctrl, true);
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LCtrl]]);
@@ -214,8 +218,8 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LCtrl]]);
         keyboard.output.clear();
-        keyboard.output.state().ctrl = false;
-        keyboard.output.state().alt = true;
+        keyboard.output.state().set_modifier(Ctrl, false);
+        keyboard.output.state().set_modifier(Alt, true);
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LAlt]]);
@@ -224,8 +228,8 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LAlt]]);
         keyboard.output.clear();
-        keyboard.output.state().alt = false;
-        keyboard.output.state().gui = true;
+        keyboard.output.state().set_modifier(Alt, false);
+        keyboard.output.state().set_modifier(Gui, true);
         keyboard.add_keypress(KeyCode::Kb1, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LGui]]);
@@ -241,18 +245,18 @@ mod tests {
         keyboard.add_keypress(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
-        assert!(keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::LAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::LCtrl, 0);
         keyboard.handle_keys().unwrap();
@@ -260,10 +264,10 @@ mod tests {
             &keyboard,
             &[&[KeyCode::LShift, KeyCode::LAlt, KeyCode::LCtrl]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::LGui, 0);
         keyboard.handle_keys().unwrap();
@@ -276,10 +280,10 @@ mod tests {
                 KeyCode::LGui,
             ]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::LGui, 0);
         keyboard.handle_keys().unwrap();
@@ -287,50 +291,50 @@ mod tests {
             &keyboard,
             &[&[KeyCode::LShift, KeyCode::LAlt, KeyCode::LCtrl]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::LCtrl, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::LAlt]]);
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::LAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift]]);
-        assert!(keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
-        assert!(!keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(!keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift]]);
-        assert!(keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::RAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
@@ -338,10 +342,10 @@ mod tests {
             &keyboard,
             &[&[KeyCode::RShift, KeyCode::RAlt, KeyCode::RCtrl]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::RGui, 0);
         keyboard.handle_keys().unwrap();
@@ -354,10 +358,10 @@ mod tests {
                 KeyCode::RGui,
             ]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::RGui, 0);
         keyboard.handle_keys().unwrap();
@@ -365,44 +369,44 @@ mod tests {
             &keyboard,
             &[&[KeyCode::RShift, KeyCode::RAlt, KeyCode::RCtrl]],
         );
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::RCtrl, 0);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::RShift, KeyCode::RAlt]]);
-        assert!(keyboard.output.state().shift);
-        assert!(keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::RAlt, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::RShift]]);
-        assert!(keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keyrelease(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
-        assert!(!keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(!keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
         keyboard.add_keypress(KeyCode::LShift, 0);
         keyboard.add_keypress(KeyCode::RShift, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::LShift, KeyCode::RShift]]);
-        assert!(keyboard.output.state().shift);
-        assert!(!keyboard.output.state().alt);
-        assert!(!keyboard.output.state().ctrl);
-        assert!(!keyboard.output.state().gui);
+        assert!(keyboard.output.state().modifier(Shift));
+        assert!(!keyboard.output.state().modifier(Ctrl));
+        assert!(!keyboard.output.state().modifier(Alt));
+        assert!(!keyboard.output.state().modifier(Gui));
         keyboard.output.clear();
     }
     #[test]
@@ -430,7 +434,7 @@ mod tests {
         );
         keyboard.add_keyrelease(KeyCode::LShift, 0);
         keyboard.handle_keys().unwrap();
-        assert!(*&keyboard.output.state().shift == false);
+        assert!(keyboard.output.state().modifier(Shift) == false);
         check_output(
             &keyboard,
             &[

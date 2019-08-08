@@ -1,16 +1,3 @@
-//todo:
-// shift remaps on layers (ie. disassociate the premade shift-combos) testing
-// oneshot deactivate if released after x seconds
-// leader does not work
-// space cadet does not work
-// combos
-// tapdance enhancemeants, on_each_tap, and max_taps?
-// toggle on x presses? - should be a tapdance impl?
-// premade toggle/oneshot modifiers
-// key lock (repeat next key until it is pressed again)
-// mouse keys? - probably out of scope of this libary
-// steganograpyh
-// unsupported: disabling a layer when one of it's rewriteTo are active?
 #![allow(dead_code)]
 #![feature(drain_filter)]
 #![no_std]
@@ -31,38 +18,57 @@ use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
+use smallbitvec::{SmallBitVec, sbvec};
+
 /// current keyboard state.
+/// 
+/// 
+#[repr(u8)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
+pub enum Modifier {
+    Shift = 0,
+    Ctrl = 1,
+    Alt = 2,
+    Gui = 3,
+}
+
+
+
 #[derive(Debug, Default)]
 pub struct KeyboardState {
-    pub shift: bool,
-    pub ctrl: bool,
-    pub alt: bool,
-    pub gui: bool,
     pub unicode_mode: UnicodeSendMode,
-    enabled_handlers: Vec<bool>,
+    modifiers_and_enabled_handlers: SmallBitVec,
 }
 impl KeyboardState {
     pub fn new() -> KeyboardState {
         KeyboardState {
-            shift: false,
-            ctrl: false,
-            alt: false,
-            gui: false,
             unicode_mode: UnicodeSendMode::Linux,
-            enabled_handlers: Vec::new(),
+            modifiers_and_enabled_handlers: sbvec![false; 4],
         }
     }
+
+    pub fn modifier(&self, modifier: Modifier) -> bool {
+        self.modifiers_and_enabled_handlers[modifier as usize]
+    }
+
+    pub fn set_modifier(&mut self, modifier: Modifier, value: bool) {
+        self.modifiers_and_enabled_handlers.set(modifier as usize, value);
+    }
+
     pub fn enable_handler(&mut self, no: HandlerID) {
-        self.enabled_handlers[no] = true;
+        self.modifiers_and_enabled_handlers.set(no, true);
     }
+
     pub fn disable_handler(&mut self, no: HandlerID) {
-        self.enabled_handlers[no] = false;
+        self.modifiers_and_enabled_handlers.set(no, false);
     }
+
     pub fn toggle_handler(&mut self, no: HandlerID) {
-        self.enabled_handlers[no] = !self.enabled_handlers[no];
+        self.modifiers_and_enabled_handlers.set(no, !self.modifiers_and_enabled_handlers[no]);
     }
+
     pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
-        self.enabled_handlers[no]
+        self.modifiers_and_enabled_handlers[no]
     }
 }
 ///an identifer for an added handler
@@ -96,10 +102,10 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
     pub fn add_handler(&mut self, handler: Box<dyn ProcessKeys<T> + Send + 'a>) -> HandlerID {
         self.output
             .state()
-            .enabled_handlers
+            .modifiers_and_enabled_handlers
             .push(handler.default_enabled());
         self.handlers.push(handler);
-        return self.handlers.len() - 1;
+        return self.output.state().modifiers_and_enabled_handlers.len() - 1;
     }
     /// handle an update to the event stream
     ///
@@ -111,9 +117,10 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
-        let enabled = self.output.state().enabled_handlers.clone();
-        for (h, e) in self.handlers.iter_mut().zip(enabled.iter()) {
-            if *e {
+        let enabled = self.output.state().modifiers_and_enabled_handlers.clone();
+        //skip the modifiers
+        for (h, e) in self.handlers.iter_mut().zip(enabled.iter().skip(4)) {
+            if e {
                 h.process_keys(&mut self.events, &mut self.output);
             }
         }
