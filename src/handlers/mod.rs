@@ -31,10 +31,31 @@ pub trait ProcessKeys<T: USBKeyOut> {
         true
     }
 }
-/// A trait for macro callbacks
+
+
+/// A callback used when one single action is needed
+/// 
+/// examples: Leader invocations.
+/// 
+/// Notably implemented on &str, so you can just pass in a &str
+/// to be send to the host computer.
+
+pub trait Trigger {
+    fn on_trigger(&mut self,output: &mut impl USBKeyOut);
+}
+
+impl Trigger for &str {
+    fn on_trigger(&mut self,output: &mut impl USBKeyOut){
+        output.send_string(self);
+    }
+}
+
+/// A trait for callbacks when an on/off action is needed
 ///
+/// 
+/// Used by PressReleaseMacros, StickyMacros, OneShots
 /// see PressReleaseMacro, StickyMacro
-pub trait MacroCallback {
+pub trait OnOff {
     fn on_activate(&mut self, output: &mut impl USBKeyOut);
     fn on_deactivate(&mut self, output: &mut impl USBKeyOut);
 }

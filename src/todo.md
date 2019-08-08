@@ -6,19 +6,14 @@ Open tasks:
  * debug spacecadet
  * rework leader
  * debug&rework tapdance
- * sticky macro to trait interface
  * improve readme
 
 
 Sort: 
 // shift remaps on layers (ie. disassociate the premade shift-combos) testing
-// oneshot deactivate if released after x seconds
-// leader does not work
-// space cadet does not work
 // combos
 // tapdance enhancemeants, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
-// premade toggle/oneshot modifiers
 // key lock (repeat next key until it is pressed again)
 // mouse keys? - probably out of scope of this libary
 // steganograpyh
@@ -26,5 +21,8 @@ Sort:
 
 Done
 
+ * oneshot deactivate if released after x ms
+ * oneshot deactivate if not consumed after x ms
  * refactor modifiers to be kept in the enable bit (saves some code in variants to Action)
  * use smallbitvec for the enablers
+ * sticky macro to trait interface

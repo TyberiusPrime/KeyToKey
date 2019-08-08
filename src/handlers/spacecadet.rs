@@ -1,4 +1,4 @@
-use crate::handlers::{MacroCallback, ProcessKeys};
+use crate::handlers::{OnOff, ProcessKeys};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -10,7 +10,7 @@ pub struct SpaceCadet<M> {
     down: bool,
     activated: bool,
 }
-impl<M: MacroCallback> SpaceCadet<M> {
+impl<M: OnOff> SpaceCadet<M> {
     pub fn new(trigger: impl AcceptsKeycode, callbacks: M) -> SpaceCadet<M> {
         SpaceCadet {
             trigger: trigger.to_u32(),
@@ -21,7 +21,7 @@ impl<M: MacroCallback> SpaceCadet<M> {
         }
     }
 }
-impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for SpaceCadet<M> {
+impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for SpaceCadet<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut initial_keypress_status: Option<EventStatus> = None;
         for (event, status) in iter_unhandled_mut(events) {

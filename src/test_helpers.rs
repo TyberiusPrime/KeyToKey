@@ -1,4 +1,4 @@
-use crate::handlers::MacroCallback;
+use crate::handlers::OnOff;
 use crate::key_codes::KeyCode;
 use crate::{
     iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
@@ -85,7 +85,7 @@ pub struct PressCounter {
     pub down_counter: u8,
     pub up_counter: u8,
 }
-impl MacroCallback for Arc<RwLock<PressCounter>> {
+impl OnOff for Arc<RwLock<PressCounter>> {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         self.write().down_counter += 1;
         output.send_keys(&[KeyCode::H]);
@@ -95,7 +95,7 @@ impl MacroCallback for Arc<RwLock<PressCounter>> {
         output.send_keys(&[KeyCode::I]);
     }
 }
-impl MacroCallback for PressCounter {
+impl OnOff for PressCounter {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         self.down_counter += 1;
         output.send_keys(&[KeyCode::H]);

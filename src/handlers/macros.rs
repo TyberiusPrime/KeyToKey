@@ -1,4 +1,4 @@
-use crate::handlers::MacroCallback;
+use crate::handlers::OnOff;
 use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
@@ -14,7 +14,7 @@ pub struct PressReleaseMacro<M> {
     keycode: u32,
     callbacks: M,
 }
-impl<M: MacroCallback> PressReleaseMacro<M> {
+impl<M: OnOff> PressReleaseMacro<M> {
     pub fn new(trigger: impl AcceptsKeycode, callbacks: M) -> PressReleaseMacro<M> {
         PressReleaseMacro {
             keycode: trigger.to_u32(),
@@ -22,7 +22,7 @@ impl<M: MacroCallback> PressReleaseMacro<M> {
         }
     }
 }
-impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
+impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for PressReleaseMacro<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
@@ -43,34 +43,32 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for PressReleaseMacro<M> {
         }
     }
 }
+
 /// a macro that is called 'on' on the the first keypress
 /// and off on the second keyrelease.
 /// Using this you can implement e.g. sticky modifiers
 ///
-pub struct StickyMacro<'a, T, F1: FnMut(&mut T), F2: FnMut(&mut T)> {
+pub struct StickyMacro<M> {
     keycode: u32,
-    on_toggle_on: F1,
-    on_toggle_off: F2,
+    callbacks: M,
     active: u8,
-    phantom: core::marker::PhantomData<&'a T>,
 }
-impl<'a, T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> StickyMacro<'a, T, F1, F2> {
+
+impl<M: OnOff> StickyMacro<M> {
     pub fn new(
         trigger: impl AcceptsKeycode,
-        on_toggle_on: F1,
-        on_toggle_off: F2,
-    ) -> StickyMacro<'a, T, F1, F2> {
+        callbacks: M
+    ) -> StickyMacro<M> {
         StickyMacro {
             keycode: trigger.to_u32(),
-            on_toggle_on,
-            on_toggle_off,
+            callbacks,
             active: 0,
-            phantom: core::marker::PhantomData,
         }
     }
 }
-impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
-    for StickyMacro<'_, T, F1, F2>
+
+impl<T: USBKeyOut, M: OnOff> ProcessKeys<T>
+    for StickyMacro<M>
 {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
@@ -82,7 +80,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                     if kc.keycode == self.keycode {
                         if self.active == 0 {
                             self.active = 1;
-                            (self.on_toggle_on)(output);
+                            self.callbacks.on_activate(output);
                         } else {
                             self.active = 2;
                         }
@@ -92,7 +90,7 @@ impl<T: USBKeyOut, F1: FnMut(&mut T), F2: FnMut(&mut T)> ProcessKeys<T>
                 Event::KeyRelease(kc) => {
                     if kc.keycode == self.keycode {
                         if self.active == 2 {
-                            (self.on_toggle_off)(output);
+                            self.callbacks.on_deactivate(output);
                         }
                         *status = EventStatus::Handled;
                     }
@@ -147,10 +145,13 @@ mod tests {
     }
     #[test]
     fn test_sticky_macro() {
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
         let l = StickyMacro::new(
             KeyCode::X,
-            |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::A]),
-            |output: &mut KeyOutCatcher| output.send_keys(&[KeyCode::B]),
+            counter.clone(),
         );
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
@@ -158,8 +159,11 @@ mod tests {
         //activate
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::A], &[]]);
+        check_output(&keyboard, &[&[KeyCode::H], &[]]);
         keyboard.output.clear();
+
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         //ignore
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
@@ -170,9 +174,15 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
+
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 0);
         //deactivate
         keyboard.add_keyrelease(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::B], &[]]);
+        check_output(&keyboard, &[&[KeyCode::I], &[]]);
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
+        
     }
 }

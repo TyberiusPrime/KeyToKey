@@ -1,5 +1,5 @@
 /// premade handlers for various occacions
-use crate::handlers::{Layer, MacroCallback, OneShot, PressReleaseMacro, SpaceCadet};
+use crate::handlers::{Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
 use crate::Modifier::*;
@@ -11,7 +11,7 @@ use no_std_compat::prelude::v1::*;
 pub struct ActionToggleHandler {
     id: HandlerID,
 }
-impl MacroCallback for ActionToggleHandler {
+impl OnOff for ActionToggleHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().toggle_handler(self.id);
     }
@@ -86,7 +86,7 @@ pub fn dvorak<'a>() -> Box<Layer<'a>> {
 pub struct ActionHandler {
     id: HandlerID,
 }
-impl MacroCallback for ActionHandler {
+impl OnOff for ActionHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().enable_handler(self.id);
     }

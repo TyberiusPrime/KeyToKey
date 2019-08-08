@@ -1,4 +1,4 @@
-use crate::handlers::{MacroCallback, ProcessKeys};
+use crate::handlers::{OnOff, ProcessKeys};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -43,7 +43,7 @@ lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
     static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
 }
-impl<M: MacroCallback> OneShot<M> {
+impl<M: OnOff> OneShot<M> {
     pub fn new(
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
@@ -63,7 +63,7 @@ impl<M: MacroCallback> OneShot<M> {
         }
     }
 }
-impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
+impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for OneShot<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
@@ -141,6 +141,7 @@ impl<T: USBKeyOut, M: MacroCallback> ProcessKeys<T> for OneShot<M> {
         }
     }
 }
+
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
