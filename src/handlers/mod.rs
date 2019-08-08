@@ -1,5 +1,7 @@
 use crate::key_stream::{Event, EventStatus};
+use crate::key_codes::KeyCode;
 use no_std_compat::prelude::v1::*;
+
 mod autoshift;
 mod layer;
 mod leader;
@@ -51,6 +53,13 @@ impl Action for &str {
         output.send_string(self);
     }
 }
+
+impl Action for KeyCode {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+        output.register_key(*self);
+    }
+}
+
 
 /// A trait for callbacks when an on/off action is needed
 ///

@@ -124,6 +124,41 @@ mod tests {
 
     }
 
+ #[test]
+    fn test_longtab_plus_mod() {
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let timeout: u16 = 1000;
+        keyboard.add_handler(Box::new(LongTap::new(UserKey::UK0, KeyCode::A, KeyCode::B, timeout)));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(UserKey::UK0, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[]]);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(UserKey::UK0, timeout-1);
+        keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::A]]);
+        keyboard.output.clear();
+
+        keyboard.add_keypress(KeyCode::LShift, 0);
+        keyboard.handle_keys().unwrap();
+        keyboard.output.clear();
+        keyboard.add_keypress(UserKey::UK0, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::LShift]]);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(UserKey::UK0, timeout);
+        keyboard.handle_keys().unwrap();
+        dbg!(&keyboard.output.reports);
+        check_output(&keyboard, &[&[KeyCode::B, KeyCode::LShift]]);
+        keyboard.output.clear();
+
+
+    }
+
 
 
 }

@@ -1,5 +1,5 @@
 /// premade handlers for various occacions
-use crate::handlers::{Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
+use crate::handlers::{Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet, Action};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
@@ -17,6 +17,13 @@ impl OnOff for ActionToggleHandler {
     }
     fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {}
 }
+
+impl Action for ActionToggleHandler {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+        output.state().toggle_handler(self.id);
+    }
+}
+
 /// Toggles a handler on and off when a key is pressed
 pub fn toggle_handler(
     trigger: impl AcceptsKeycode,
