@@ -1,8 +1,8 @@
-use crate::handlers::{ProcessKeys, Trigger};
+use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::USBKeyOut;
 use crate::Modifier::*;
+use crate::USBKeyOut;
 
 use no_std_compat::prelude::v1::*;
 pub enum LayerAction<'a> {
@@ -108,11 +108,11 @@ mod tests {
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
+    use crate::Modifier::*;
     #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    use crate::Modifier::*;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]

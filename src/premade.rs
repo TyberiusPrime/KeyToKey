@@ -1,8 +1,8 @@
 /// premade handlers for various occacions
 use crate::handlers::{Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
-use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
 use crate::Modifier::*;
+use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
 use no_std_compat::prelude::v1::*;
 ///toggle a handler on activate
 /// do noting on deactivate
@@ -81,7 +81,7 @@ pub fn dvorak<'a>() -> Box<Layer<'a>> {
 
 /// Enable/disable handler (layer) on activation/deactivation
 /// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
-/// 
+///
 /// Can also be used with Modifier::* (pass in mod as HandelerID)
 pub struct ActionHandler {
     id: HandlerID,
@@ -99,7 +99,9 @@ pub fn one_shot_shift(held_timeout: u16, released_timeout: u16) -> Box<OneShot<A
     Box::new(OneShot::new(
         KeyCode::LShift,
         KeyCode::RShift,
-        ActionHandler {id: Shift as HandlerID},
+        ActionHandler {
+            id: Shift as HandlerID,
+        },
         held_timeout,
         released_timeout,
     ))
@@ -109,7 +111,9 @@ pub fn one_shot_ctrl(held_timeout: u16, released_timeout: u16) -> Box<OneShot<Ac
     Box::new(OneShot::new(
         KeyCode::LCtrl,
         KeyCode::RCtrl,
-        ActionHandler {id: Ctrl as HandlerID},
+        ActionHandler {
+            id: Ctrl as HandlerID,
+        },
         held_timeout,
         released_timeout,
     ))
@@ -119,7 +123,9 @@ pub fn one_shot_alt(held_timeout: u16, released_timeout: u16) -> Box<OneShot<Act
     Box::new(OneShot::new(
         KeyCode::LAlt,
         KeyCode::RAlt,
-        ActionHandler {id: Alt as HandlerID},
+        ActionHandler {
+            id: Alt as HandlerID,
+        },
         held_timeout,
         released_timeout,
     ))
@@ -129,7 +135,9 @@ pub fn one_shot_gui(held_timeout: u16, released_timeout: u16) -> Box<OneShot<Act
     Box::new(OneShot::new(
         KeyCode::LGui,
         KeyCode::RGui,
-        ActionHandler {id: Gui as HandlerID},
+        ActionHandler {
+            id: Gui as HandlerID,
+        },
         held_timeout,
         released_timeout,
     ))
@@ -148,14 +156,12 @@ pub fn one_shot_handler(
         held_timeout,
         released_timeout,
     ))
-
 }
 pub fn space_cadet_handler(
     trigger: impl AcceptsKeycode,
     id: HandlerID,
 ) -> Box<SpaceCadet<ActionHandler>> {
     Box::new(SpaceCadet::new(trigger, ActionHandler { id }))
-
 }
 /// Handler for turing Copy/Paste/Cut Keycodes into 'universal'
 /// Ctrl-Insert, Shift-insert, shift-delete keystrokes
@@ -209,12 +215,12 @@ mod tests {
     use crate::premade::{dvorak, toggle_handler};
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
+    use crate::Modifier::*;
     #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
     use no_std_compat::prelude::v1::*;
-    use crate::Modifier::*;
 
     #[test]
     fn test_toggle_handler() {

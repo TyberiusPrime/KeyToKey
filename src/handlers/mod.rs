@@ -3,16 +3,19 @@ use no_std_compat::prelude::v1::*;
 mod autoshift;
 mod layer;
 mod leader;
+mod longtap;
 mod macros;
 mod oneshot;
 mod spacecadet;
 mod tapdance;
 mod unicodekeyboard;
 mod usbkeyboard;
+
 use crate::USBKeyOut;
 pub use autoshift::AutoShift;
 pub use layer::{Layer, LayerAction};
 pub use leader::Leader;
+pub use longtap::LongTap;
 pub use macros::{PressReleaseMacro, StickyMacro};
 pub use oneshot::OneShot;
 pub use spacecadet::SpaceCadet;
@@ -32,27 +35,26 @@ pub trait ProcessKeys<T: USBKeyOut> {
     }
 }
 
-
 /// A callback used when one single action is needed
-/// 
+///
 /// examples: Leader invocations.
-/// 
+///
 /// Notably implemented on &str, so you can just pass in a &str
 /// to be send to the host computer.
 
-pub trait Trigger {
-    fn on_trigger(&mut self,output: &mut impl USBKeyOut);
+pub trait Action {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut);
 }
 
-impl Trigger for &str {
-    fn on_trigger(&mut self,output: &mut impl USBKeyOut){
+impl Action for &str {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
         output.send_string(self);
     }
 }
 
 /// A trait for callbacks when an on/off action is needed
 ///
-/// 
+///
 /// Used by PressReleaseMacros, StickyMacros, OneShots
 /// see PressReleaseMacro, StickyMacro
 pub trait OnOff {

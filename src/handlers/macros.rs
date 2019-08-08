@@ -55,10 +55,7 @@ pub struct StickyMacro<M> {
 }
 
 impl<M: OnOff> StickyMacro<M> {
-    pub fn new(
-        trigger: impl AcceptsKeycode,
-        callbacks: M
-    ) -> StickyMacro<M> {
+    pub fn new(trigger: impl AcceptsKeycode, callbacks: M) -> StickyMacro<M> {
         StickyMacro {
             keycode: trigger.to_u32(),
             callbacks,
@@ -67,9 +64,7 @@ impl<M: OnOff> StickyMacro<M> {
     }
 }
 
-impl<T: USBKeyOut, M: OnOff> ProcessKeys<T>
-    for StickyMacro<M>
-{
+impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for StickyMacro<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
@@ -149,10 +144,7 @@ mod tests {
             down_counter: 0,
             up_counter: 0,
         }));
-        let l = StickyMacro::new(
-            KeyCode::X,
-            counter.clone(),
-        );
+        let l = StickyMacro::new(KeyCode::X, counter.clone());
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -183,6 +175,5 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::I], &[]]);
         assert!(counter.read().down_counter == 1);
         assert!(counter.read().up_counter == 1);
-        
     }
 }

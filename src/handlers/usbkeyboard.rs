@@ -1,11 +1,11 @@
 use crate::handlers::ProcessKeys;
 use crate::key_codes::{KeyCode, UNICODE_BELOW_256};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
+use crate::Modifier::*;
 use crate::USBKeyOut;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
 use smallbitvec::sbvec;
-use crate::Modifier::*;
 
 /// The default bottom layer
 ///
@@ -39,7 +39,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         *status = EventStatus::Handled;
                     }
                     if kc.keycode == KeyCode::LShift.into() || kc.keycode == KeyCode::RShift.into()
-                {
+                    {
                         output.state().set_modifier(Shift, false);
                     } else if kc.keycode == KeyCode::LCtrl.into()
                         || kc.keycode == KeyCode::RCtrl.into()
@@ -80,7 +80,6 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                         {
                             output.state().set_modifier(Alt, true);
                             modifiers_sent.set(2, true);
-
                         } else if kc.keycode == KeyCode::LGui.into()
                             || kc.keycode == KeyCode::RGui.into()
                         {
@@ -131,11 +130,11 @@ mod tests {
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
+    use crate::Modifier::*;
     #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    use crate::Modifier::*;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]

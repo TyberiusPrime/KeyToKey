@@ -31,6 +31,7 @@ pub enum EventStatus {
     Handled,
     Ignored,
 }
+
 pub fn iter_unhandled_mut(
     events: &mut Vec<(Event, EventStatus)>,
 ) -> impl DoubleEndedIterator<Item = &mut (Event, EventStatus)> {
@@ -38,3 +39,18 @@ pub fn iter_unhandled_mut(
         .iter_mut()
         .filter(|(_e, status)| EventStatus::Unhandled == *status)
 }
+/*
+pub fn iter_unhandled_mut_matching(
+    events: &mut Vec<(Event, EventStatus)>,
+    trigger: u32,
+) -> impl DoubleEndedIterator<Item = &mut (Event, EventStatus)> {
+    events.iter_mut().filter(|(e, status)| {
+        EventStatus::Unhandled == *status
+            && match e {
+                Event::KeyPress(kc) => kc.keycode == trigger,
+                Event::KeyRelease(kc) => kc.keycode == trigger,
+                Event::TimeOut => false,
+            }
+    })
+}
+*/

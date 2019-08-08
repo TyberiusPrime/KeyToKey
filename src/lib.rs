@@ -18,11 +18,11 @@ use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
-use smallbitvec::{SmallBitVec, sbvec};
+use smallbitvec::{sbvec, SmallBitVec};
 
 /// current keyboard state.
-/// 
-/// 
+///
+///
 #[repr(u8)]
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum Modifier {
@@ -31,8 +31,6 @@ pub enum Modifier {
     Alt = 2,
     Gui = 3,
 }
-
-
 
 #[derive(Debug, Default)]
 pub struct KeyboardState {
@@ -52,7 +50,8 @@ impl KeyboardState {
     }
 
     pub fn set_modifier(&mut self, modifier: Modifier, value: bool) {
-        self.modifiers_and_enabled_handlers.set(modifier as usize, value);
+        self.modifiers_and_enabled_handlers
+            .set(modifier as usize, value);
     }
 
     pub fn enable_handler(&mut self, no: HandlerID) {
@@ -64,7 +63,8 @@ impl KeyboardState {
     }
 
     pub fn toggle_handler(&mut self, no: HandlerID) {
-        self.modifiers_and_enabled_handlers.set(no, !self.modifiers_and_enabled_handlers[no]);
+        self.modifiers_and_enabled_handlers
+            .set(no, !self.modifiers_and_enabled_handlers[no]);
     }
 
     pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
