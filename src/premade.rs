@@ -1,5 +1,5 @@
 /// premade handlers for various occacions
-use crate::handlers::{Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet, Action};
+use crate::handlers::{Action, Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
@@ -9,7 +9,7 @@ use no_std_compat::prelude::v1::*;
 /// probably only usefull with PressReleaseMacro
 /// used by toggle_handler()
 pub struct ActionToggleHandler {
-    id: HandlerID,
+    pub id: HandlerID,
 }
 impl OnOff for ActionToggleHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
@@ -164,11 +164,24 @@ pub fn one_shot_handler(
         released_timeout,
     ))
 }
+
+/// A space cadet (pass through on tap,
+/// on/off on pressed+other keys)
+/// that turns a handler on/off.
+///
+/// Note that this needs to be before the handler
+/// it toggles in the handler order,
+/// so you need to use
+///
+/// keyboard.add_handler(space_cadet_handler(trigger, keyboard.future_handler_id(2)));
+/// keyboard.add_handler(Box::new(Layer(...)))
+///
 pub fn space_cadet_handler(
     trigger: impl AcceptsKeycode,
+    action: KeyCode,
     id: HandlerID,
-) -> Box<SpaceCadet<ActionHandler>> {
-    Box::new(SpaceCadet::new(trigger, ActionHandler { id }))
+) -> Box<SpaceCadet<KeyCode, ActionHandler>> {
+    Box::new(SpaceCadet::new(trigger, action, ActionHandler { id }))
 }
 /// Handler for turing Copy/Paste/Cut Keycodes into 'universal'
 /// Ctrl-Insert, Shift-insert, shift-delete keystrokes

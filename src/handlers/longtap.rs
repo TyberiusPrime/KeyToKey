@@ -32,7 +32,7 @@ impl<M1: Action, M2: Action> LongTap<M1, M2> {
 /// and another on a long tab with a configurable threshold
 ///
 /// Action happens on release
-/// 
+///
 /// Note that this is a simple implementation that just considers
 /// the time from the last key-event withouth considering
 /// whether that was actually the press of the LongTap key
@@ -62,12 +62,11 @@ impl<T: USBKeyOut, M1: Action, M2: Action> ProcessKeys<T> for LongTap<M1, M2> {
     }
 }
 
-
 #[cfg(test)]
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{LongTap, Action, USBKeyboard};
+    use crate::handlers::{Action, LongTap, USBKeyboard};
     #[allow(unused_imports)]
     use crate::key_codes::{KeyCode, UserKey};
     #[allow(unused_imports)]
@@ -81,22 +80,27 @@ mod tests {
 
     #[test]
     fn test_longtab() {
-        struct Short ();
-        struct Long() ;
+        struct Short();
+        struct Long();
         impl Action for Short {
-        fn on_trigger(&mut self, output: &mut impl USBKeyOut){
-            output.send_keys(&[KeyCode::A]);
-        }
+            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+                output.send_keys(&[KeyCode::A]);
+            }
         }
         impl Action for Long {
-        fn on_trigger(&mut self, output: &mut impl USBKeyOut){
-            output.send_keys(&[KeyCode::B]);
-        }
+            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+                output.send_keys(&[KeyCode::B]);
+            }
         }
 
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let timeout: u16 = 1000;
-        keyboard.add_handler(Box::new(LongTap::new(UserKey::UK0, Short{}, Long{}, timeout)));
+        keyboard.add_handler(Box::new(LongTap::new(
+            UserKey::UK0,
+            Short {},
+            Long {},
+            timeout,
+        )));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(UserKey::UK0, 0);
@@ -104,7 +108,7 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(UserKey::UK0, timeout-1);
+        keyboard.add_keyrelease(UserKey::UK0, timeout - 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::A], &[]]);
@@ -120,15 +124,18 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::B], &[]]);
         keyboard.output.clear();
-
-
     }
 
- #[test]
+    #[test]
     fn test_longtab_plus_mod() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let timeout: u16 = 1000;
-        keyboard.add_handler(Box::new(LongTap::new(UserKey::UK0, KeyCode::A, KeyCode::B, timeout)));
+        keyboard.add_handler(Box::new(LongTap::new(
+            UserKey::UK0,
+            KeyCode::A,
+            KeyCode::B,
+            timeout,
+        )));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
         keyboard.add_keypress(UserKey::UK0, 0);
@@ -136,7 +143,7 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
 
-        keyboard.add_keyrelease(UserKey::UK0, timeout-1);
+        keyboard.add_keyrelease(UserKey::UK0, timeout - 1);
         keyboard.handle_keys().unwrap();
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::A]]);
@@ -155,11 +162,5 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(&keyboard, &[&[KeyCode::B, KeyCode::LShift]]);
         keyboard.output.clear();
-
-
     }
-
-
-
 }
-

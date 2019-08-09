@@ -1,5 +1,5 @@
-use crate::key_stream::{Event, EventStatus};
 use crate::key_codes::KeyCode;
+use crate::key_stream::{Event, EventStatus};
 use no_std_compat::prelude::v1::*;
 
 mod autoshift;
@@ -48,18 +48,21 @@ pub trait Action {
     fn on_trigger(&mut self, output: &mut impl USBKeyOut);
 }
 
+/// send a string as an Action
 impl Action for &str {
     fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
         output.send_string(self);
     }
 }
 
+/// Register a key as an Action
+///
+/// that means the current modifiers are sent as well by USBKeyboard
 impl Action for KeyCode {
     fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
         output.register_key(*self);
     }
 }
-
 
 /// A trait for callbacks when an on/off action is needed
 ///

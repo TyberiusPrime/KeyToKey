@@ -59,7 +59,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                     let mut send = false;
                     if codes_to_delete.contains(&kc.original_keycode) {
                         *status = EventStatus::Handled;
-                        if kc.flag == 0 {
+                        if kc.flag & 0x1 == 0 {
                             //we have never send this before
                             send = true;
                         }

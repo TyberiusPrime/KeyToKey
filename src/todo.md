@@ -1,7 +1,6 @@
 Open tasks:
 
- * debug spacecadet
-  rework leader
+ * rework leader
  * debug&rework tapdance
  * improve readme
  * Layers: Allow passing triggers - Unfortunatly, you can't just use Trigger,
@@ -29,3 +28,4 @@ Done
  * sticky macro to trait interface
  * TapAndLongTap functionality
  * correctly handle layer on/off while a key is depressed
+ * debug spacecadet (actually a new implementation, but it seems to work ok)

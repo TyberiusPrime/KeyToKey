@@ -2,13 +2,14 @@ use no_std_compat::prelude::v1::*;
 #[derive(PartialEq, Debug)]
 pub struct Key {
     pub keycode: u32,
-    pub original_keycode: u32, //used to match key press/release pairs
+    pub original_keycode: u32, //used to match key press/release pairs - can we save on this anyhow?
     pub ms_since_last: u16,
     pub running_number: u8,
     pub flag: u8, //Todo: express this better
                   //bit 0 is used by Usbkeyboard to decide whether a KeyPress has ever been sent
                   //(or kept back by a different handler so far)
-                  //bit1 is used to protect against double rewrites
+                  //bit1 is used to protect against double rewrites in Layers
+                  //bit2 is used by SpaceCadet.
 }
 impl Key {
     pub fn new(keycode: u32) -> Key {

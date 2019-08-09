@@ -107,6 +107,14 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         self.handlers.push(handler);
         return self.output.state().modifiers_and_enabled_handlers.len() - 1;
     }
+
+    /// predict the next or further out hander_ids returned by add_handler
+    /// Needed to add space cadets before the layers they toggle.
+    pub fn future_handler_id(&self, offset: usize) -> HandlerID {
+        let current = self.output.ro_state().modifiers_and_enabled_handlers.len() - 1;
+        current + offset
+    }
+
     /// handle an update to the event stream
     ///
     /// This returns OK(()) if all keys are handled by the handlers
@@ -117,10 +125,9 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         for (_e, status) in self.events.iter_mut() {
             *status = EventStatus::Unhandled;
         }
-        let enabled = self.output.state().modifiers_and_enabled_handlers.clone();
         //skip the modifiers
-        for (h, e) in self.handlers.iter_mut().zip(enabled.iter().skip(4)) {
-            if e {
+        for (ii, h) in self.handlers.iter_mut().enumerate() {
+            if self.output.state().modifiers_and_enabled_handlers[ii+4] {
                 h.process_keys(&mut self.events, &mut self.output);
             }
         }
@@ -237,6 +244,7 @@ pub trait USBKeyOut {
     fn send_empty(&mut self);
     /// retrieve a mutable KeyboardState
     fn state(&mut self) -> &mut KeyboardState;
+    fn ro_state(&self) -> &KeyboardState;
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {
             UnicodeSendMode::Linux => {

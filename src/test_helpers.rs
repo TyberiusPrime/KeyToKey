@@ -30,6 +30,11 @@ impl USBKeyOut for KeyOutCatcher {
     fn state(&mut self) -> &mut KeyboardState {
         return &mut self.state;
     }
+
+    fn ro_state(&self) -> &KeyboardState {
+        return &self.state;
+    }
+
     fn send_keys(&mut self, keys: &[KeyCode]) {
         self.reports.push(keys.iter().map(|&x| x.to_u8()).collect());
     }
@@ -46,12 +51,22 @@ impl USBKeyOut for KeyOutCatcher {
         self.reports.push(Vec::new());
     }
 }
+#[cfg(test)]
 pub fn check_output(keyboard: &Keyboard<KeyOutCatcher>, should: &[&[KeyCode]]) {
+    if !(should.len() == keyboard.output.reports.len()) {
+        dbg!(&keyboard.output.reports);
+    }
     assert!(should.len() == keyboard.output.reports.len());
     for (ii, report) in should.iter().enumerate() {
+        if !(keyboard.output.reports[ii].len() == report.len()) {
+            dbg!(&keyboard.output.reports);
+        }
         assert!(keyboard.output.reports[ii].len() == report.len());
         for k in report.iter() {
             let kcu: u8 = (*k).to_u8();
+            if !(keyboard.output.reports[ii].contains(&kcu)) {
+                dbg!(&keyboard.output.reports);
+            }
             assert!(keyboard.output.reports[ii].contains(&kcu));
         }
     }
@@ -111,7 +126,7 @@ pub struct Debugger {
 }
 #[cfg(test)]
 impl Debugger {
-    fn new(s: String) -> Debugger {
+    pub fn new(s: String) -> Debugger {
         Debugger { s }
     }
 }

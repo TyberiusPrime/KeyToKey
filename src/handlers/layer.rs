@@ -229,14 +229,12 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::B]]);
     }
-   #[test]
+    #[test]
     fn test_layer_disable_in_the_middle() {
         use crate::handlers::LayerAction::RewriteTo;
         use crate::AcceptsKeycode;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let l = Layer::new(vec![
-            (KeyCode::A, RewriteTo(KeyCode::B.to_u32())),
-        ]);
+        let l = Layer::new(vec![(KeyCode::A, RewriteTo(KeyCode::B.to_u32()))]);
         let layer_id = keyboard.add_handler(Box::new(l));
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
@@ -254,7 +252,4 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         keyboard.output.clear();
     }
-
-
-
 }
