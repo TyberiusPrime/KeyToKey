@@ -9,7 +9,9 @@ Open tasks:
  * Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
  * escapeOff to more general premade turn-the-layers off thing.
  * test and document space cadet only working by itself - not when any other key is pressed
- * fix interaction between oneshot modifiers (shift) and SpaceCadet not shifting unless oneshot is being used as a regular modifier
+ * layer SendStringShifted 
+
+
 
 
 Sort: 

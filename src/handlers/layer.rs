@@ -288,4 +288,29 @@ mod tests {
         );
         keyboard.output.clear();
     }
+
+    #[test]
+    fn test_layer_rewrite_unicode() {
+        let l = Layer::new(vec![(KeyCode::A, LayerAction::RewriteTo(0xDF))]);
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(crate::test_helpers::Debugger::new("start")));
+        keyboard.output.state().unicode_mode = UnicodeSendMode::Debug;
+        let layer_id = keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(crate::test_helpers::Debugger::new("bu")));
+        keyboard.add_handler(Box::new(UnicodeKeyboard::new()));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.add_keypress(KeyCode::J, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::J]]);
+        keyboard.output.clear();
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::J]]);
+        keyboard.output.clear();
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::D], &[KeyCode::F], &[KeyCode::J]]);
+        panic!();
+    }
 }

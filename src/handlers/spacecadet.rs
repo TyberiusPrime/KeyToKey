@@ -48,7 +48,7 @@ impl<MAction: Action, MOnOff: OnOff> SpaceCadet<MAction, MOnOff> {
             onoff,
             press_number: 0, //what was the running id of this?
             state: SpaceCadetState::Base,
-            minimum_depress_ms: 200,
+            minimum_depress_ms: 100,
         }
     }
 }
