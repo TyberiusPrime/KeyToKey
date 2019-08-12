@@ -7,17 +7,18 @@ use no_std_compat::prelude::v1::*;
 #[repr(u8)]
 #[derive(Clone, Copy)]
 enum SpaceCadetState {
-    Base,      //not triggrered
-    Pressed,   //could be either a tap or an onoff
-    Activated, //an onoff
+    Base,       //not triggrered
+    Pressed,    //could be either a tap or an onoff
+    Activated,  //an onoff
+    PressedTap, //must be a tap
 }
 
 /// SpaceCadet Keys
 /// are keys that do one Action on tap,
 /// and an OnOff if depressed while the
 /// next key is pressed.
-/// 
-/// There is a minimum time the key needs to be depressed, 
+///
+/// There is a minimum time the key needs to be depressed,
 /// which you can configure with SpaceCadet.minimum_depress_ms
 /// (this is to allow fast typing where you actually hit the next
 /// key before the previous one has been released. It does
@@ -55,20 +56,38 @@ impl<MAction: Action, MOnOff: OnOff> SpaceCadet<MAction, MOnOff> {
 //todo: space cadet eats the tap in fast typing.
 impl<T: USBKeyOut, MAction: Action, MOnOff: OnOff> ProcessKeys<T> for SpaceCadet<MAction, MOnOff> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+        let mut any_other_seen = false;
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
-                    if kc.keycode == self.trigger && kc.flag & 0x1 == 0 { //the flag is necessary to prevent rewritten keys from triggering again
-                        self.state = SpaceCadetState::Pressed;
+                    if kc.keycode == self.trigger {
+                        if kc.flag & 0x1 == 0 {
+                            //the flag is necessary to prevent rewritten keys from triggering again
+                            if any_other_seen {
+                                self.state = SpaceCadetState::PressedTap;
+                                self.action.on_trigger(output);
+                                self.state = SpaceCadetState::Base;
+                            } else {
+                                self.state = SpaceCadetState::Pressed;
+                            }
+                        }
                         *status = EventStatus::Handled;
-                    } else if let SpaceCadetState::Pressed = self.state {
-                        if kc.ms_since_last >= self.minimum_depress_ms {
-                            self.state = SpaceCadetState::Activated;
-                            self.onoff.on_activate(output);
-                        } else {
-                            //a 'botched' activation
-                            self.action.on_trigger(output);
-                            self.state = SpaceCadetState::Base;
+                    } else {
+                        match self.state {
+                            SpaceCadetState::Pressed => {
+                                if kc.ms_since_last >= self.minimum_depress_ms {
+                                    self.state = SpaceCadetState::Activated;
+                                    self.onoff.on_activate(output);
+                                } else {
+                                    //a 'botched' activation
+                                    self.action.on_trigger(output);
+                                    self.state = SpaceCadetState::Base;
+                                }
+                            }
+                            SpaceCadetState::Base => {
+                                any_other_seen = true;
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -83,7 +102,7 @@ impl<T: USBKeyOut, MAction: Action, MOnOff: OnOff> ProcessKeys<T> for SpaceCadet
                                 self.state = SpaceCadetState::Base;
                                 self.onoff.on_deactivate(output);
                             }
-                            SpaceCadetState::Base => {}
+                            SpaceCadetState::Base | SpaceCadetState::PressedTap => {}
                         }
                     }
                 }
@@ -283,8 +302,7 @@ mod tests {
         keyboard.output.state().disable_handler(numpad_id);
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
-
-    //the modifier
+        //the modifier
         keyboard.add_keypress(KeyCode::X, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[]]);

@@ -73,7 +73,7 @@ impl KeyboardState {
 }
 ///an identifer for an added handler
 /// to be used with Keyboard.output.enable_handler and consorts
-type HandlerID = usize;
+pub type HandlerID = usize;
 /// the main keyboard struct
 ///
 /// add handlers wit add_handler,
@@ -127,7 +127,7 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         }
         //skip the modifiers
         for (ii, h) in self.handlers.iter_mut().enumerate() {
-            if self.output.state().modifiers_and_enabled_handlers[ii+4] {
+            if self.output.state().modifiers_and_enabled_handlers[ii + 4] {
                 h.process_keys(&mut self.events, &mut self.output);
             }
         }
@@ -213,16 +213,16 @@ fn hex_digit_to_keycode(digit: char) -> KeyCode {
     //todo which way it's shorter in machine code this or
     //with the derived nums...
     match digit {
-        '0' => KeyCode::Kb0,
-        '1' => KeyCode::Kb1,
-        '2' => KeyCode::Kb2,
-        '3' => KeyCode::Kb3,
-        '4' => KeyCode::Kb4,
-        '5' => KeyCode::Kb5,
-        '6' => KeyCode::Kb6,
-        '7' => KeyCode::Kb7,
-        '8' => KeyCode::Kb8,
-        '9' => KeyCode::Kb9,
+        '0' => KeyCode::Kp0,
+        '1' => KeyCode::Kp1,
+        '2' => KeyCode::Kp2,
+        '3' => KeyCode::Kp3,
+        '4' => KeyCode::Kp4,
+        '5' => KeyCode::Kp5,
+        '6' => KeyCode::Kp6,
+        '7' => KeyCode::Kp7,
+        '8' => KeyCode::Kp8,
+        '9' => KeyCode::Kp9,
         'A' | 'a' => KeyCode::A,
         'B' | 'b' => KeyCode::B,
         'C' | 'c' => KeyCode::C,
@@ -249,10 +249,12 @@ pub trait USBKeyOut {
         match self.state().unicode_mode {
             UnicodeSendMode::Linux => {
                 self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, KeyCode::U]);
-                let escaped = c.escape_unicode();
-                for out_c in escaped.skip(3).take_while(|x| *x != '}') {
-                    self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, hex_digit_to_keycode(out_c)]);
+                self.send_empty();
+                for out_c in c.escape_unicode().skip(3).take_while(|x| *x != '}') {
+                    self.send_keys(&[hex_digit_to_keycode(out_c)]);
+                    self.send_empty();
                 }
+                self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
             }
             UnicodeSendMode::WinCompose => {
@@ -266,9 +268,13 @@ pub trait USBKeyOut {
                 self.send_empty();
             }
             UnicodeSendMode::Debug => {
-                let mut buf = [0, 0, 0, 0];
-                c.encode_utf8(&mut buf);
-                self.send_keys(&[(u32::from(buf[0]) + UNICODE_BELOW_256).try_into().unwrap()]);
+                let escaped = c.escape_unicode();
+                for out_c in escaped.skip(3).take_while(|x| *x != '}') {
+                    self.send_keys(&[hex_digit_to_keycode(out_c)]);
+                }
+                //let mut buf = [0, 0, 0, 0];
+                //c.encode_utf8(&mut buf);
+                //self.send_keys(&[(u32::from(buf[0]) + UNICODE_BELOW_256).try_into().unwrap()]);
             }
         }
     }
@@ -309,3 +315,15 @@ fn ascii_to_keycode(c: char, ascii_offset: u8, keycode_offset: KeyCode) -> KeyCo
 #[cfg(test)]
 #[macro_use]
 extern crate std;
+
+mod tests {
+    #[test]
+    fn test_hexdigit_to_keycode() {
+        for c in "ABCDEFHIJKLMOJPQRSTUVWYXYZabcdefghijklmnopqrstuvwxyz".chars() {
+            let escaped = c.escape_unicode();
+            for out_c in escaped.skip(3).take_while(|x| *x != '}') {
+                println!("{}", out_c);
+            }
+        }
+    }
+}

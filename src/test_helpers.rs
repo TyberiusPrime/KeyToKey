@@ -126,8 +126,8 @@ pub struct Debugger {
 }
 #[cfg(test)]
 impl Debugger {
-    pub fn new(s: String) -> Debugger {
-        Debugger { s }
+    pub fn new(s: &str) -> Debugger {
+        Debugger { s: s.to_string() }
     }
 }
 #[cfg(test)]

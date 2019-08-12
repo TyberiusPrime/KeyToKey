@@ -12,6 +12,10 @@ use no_std_compat::prelude::v1::*;
 /// Use UserKey::* for totally custom keys
 pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
+    pub fn new() -> UnicodeKeyboard {
+        UnicodeKeyboard {}
+    }
+
     fn is_unicode_keycode(keycode: u32) -> bool {
         match keycode {
             0xF0000..=0xFFFFD => false,   //unicode private character range A
@@ -86,8 +90,12 @@ mod tests {
             &keyboard,
             &[
                 &[U, LShift, LCtrl],
-                &[E, LShift, LCtrl],
-                &[Kb4, LShift, LCtrl],
+                &[],
+                &[E],
+                &[],
+                &[Kp4],
+                &[],
+                &[Enter],
                 &[],
             ],
         );
@@ -110,7 +118,7 @@ mod tests {
         dbg!(&keyboard.output.reports);
         check_output(
             &keyboard,
-            &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[]],
+            &[&[RAlt], &[U], &[Kp3], &[B], &[Kp4], &[Enter], &[]],
         );
         assert!(keyboard.events.is_empty()); // we eat the keypress though
     }
@@ -134,7 +142,7 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(
             &keyboard,
-            &[&[RAlt], &[U], &[Kb3], &[B], &[Kb4], &[Enter], &[], &[A]],
+            &[&[RAlt], &[U], &[Kp3], &[B], &[Kp4], &[Enter], &[], &[A]],
         );
         keyboard.add_keyrelease(A, 0);
         keyboard.output.clear();

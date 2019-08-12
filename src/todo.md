@@ -6,7 +6,10 @@ Open tasks:
  * Layers: Allow passing triggers - Unfortunatly, you can't just use Trigger,
    since the impl USBKeyOut means it's generic, and turning
    it into a Trigger<T: USBKeyOut>  bubbles the output type into the LayerAction, then into the Layer, and then we run into some Sync/Send issue that I can't fathom
-* Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
+ * Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
+ * escapeOff to more general premade turn-the-layers off thing.
+ * test and document space cadet only working by itself - not when any other key is pressed
+ * fix interaction between oneshot modifiers (shift) and SpaceCadet not shifting unless oneshot is being used as a regular modifier
 
 
 Sort: 

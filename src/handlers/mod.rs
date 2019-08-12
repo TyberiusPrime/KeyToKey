@@ -16,7 +16,7 @@ mod usbkeyboard;
 use crate::USBKeyOut;
 pub use autoshift::AutoShift;
 pub use layer::{Layer, LayerAction};
-pub use leader::Leader;
+//pub use leader::Leader;
 pub use longtap::LongTap;
 pub use macros::{PressReleaseMacro, StickyMacro};
 pub use oneshot::OneShot;

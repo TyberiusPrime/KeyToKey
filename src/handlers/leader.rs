@@ -1,3 +1,4 @@
+/*
 use crate::handlers::ProcessKeys;
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
@@ -192,3 +193,5 @@ mod tests {
         check_output(&keyboard, &[&[69u8.try_into().unwrap()], &[]]);
     }
 }
+
+*/
