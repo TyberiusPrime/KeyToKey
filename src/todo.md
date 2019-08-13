@@ -11,6 +11,7 @@ Open tasks:
  * test and document space cadet only working by itself - not when any other key is pressed
  * layer SendStringShifted  test
  * dvorak - replace with const something to safe on RAM
+ * interaction of space cadet and one shot - oneshot degenrates into modifier?
 
 
 

@@ -16,21 +16,21 @@ pub enum LayerAction<'a> {
 
 /// A layer either rewrites a key to another one
 /// or outputs a string upon key release.
-/// 
+///
 /// It does this for multiple mappings at once,
-/// and it can consider the shift state, which 
+/// and it can consider the shift state, which
 /// is very useful for unicode characters with lower
 /// and upper case.
-/// 
+///
 /// Unfortunatly, Layers are memory inefficient,
 /// they keep their mapping in ram, and each mapping is at least
 /// 96 bits / 12 bytes.
-/// 
+///
 /// Consider using a RewriteLayer instead if you don't need
 /// the string or Shift functionality.
-/// 
-/// 
-/// 
+///
+///
+///
 pub struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
 }

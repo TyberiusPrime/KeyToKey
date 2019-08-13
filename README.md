@@ -40,6 +40,7 @@ Basic features
 
 Advanced Features working
  * Layers (which can rewrite key codes, conditionally rewrite them based on shift status or send arbitrary strings, again dependeant on shift)
+ * RewriteLayers (which can only rewrite key codes, but are much more memory efficient)
  * PressReleaseMacros (callbacks on key press / key release)
  * StickyMacros (Tap once to activate, again to deactivate){
  * OneShots (Press -> activate, deactivates after next any-not-one-shot key press - useful for modifiers or temporarily activated layers)

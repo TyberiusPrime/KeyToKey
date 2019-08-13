@@ -332,6 +332,14 @@ pub enum UserKey {
     UK98 = 0xF0162,
     UK99 = 0xF0163,
 }
+
+impl UserKey {
+  pub const fn to_u32(self) -> u32 {
+        let u = self as u32;
+        return u as u32;
+    }
+}
+
 /// Trait for things that can be converted to a u32 keycode
 /// ie. various integers and (usb) KeyCodes themselves
 pub trait AcceptsKeycode {
@@ -368,5 +376,19 @@ impl AcceptsKeycode for &UserKey {
     fn to_u32(&self) -> u32 {
         let r: u32 = (**self).into();
         r
+    }
+}
+
+pub trait KeyCodeInfo {
+    fn is_usb_keycode(self) -> bool;
+    fn is_private_keycode(self) -> bool;
+}
+
+impl KeyCodeInfo for u32 {
+    fn is_usb_keycode(self) -> bool{
+        return UNICODE_BELOW_256 <= self && self <= UNICODE_BELOW_256 + 0xE7; //RGui
+    }
+    fn is_private_keycode(self) -> bool {
+        return UserKey::UK0.to_u32() <= self && self <= UserKey::UK99.to_u32(); //RGui
     }
 }

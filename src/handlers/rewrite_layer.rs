@@ -10,7 +10,7 @@ use no_std_compat::prelude::v1::*;
 /// The advantage of this is that you can/must use it with a const
 /// array (slice), which greatly saves on ram compared to Layer
 /// (e.g. premade::dvorak)
-/// 
+///
 pub struct RewriteLayer {
     rewrites: &'static [(u32, u32)],
 }
@@ -63,9 +63,7 @@ mod tests {
     use crate::handlers::{RewriteLayer, USBKeyboard, UnicodeKeyboard};
     use crate::key_codes::KeyCode;
     use crate::test_helpers::{check_output, KeyOutCatcher};
-    use crate::{
-        Keyboard, USBKeyOut, UnicodeSendMode,
-    };
+    use crate::{Keyboard, USBKeyOut, UnicodeSendMode};
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 
@@ -120,11 +118,6 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::X], &[]]);
-
-        //TODO: what happens when you disable the layer in the middle?
-        // I suspect that we will keep repeating one of the keycodes.
-        // what would be the sensible thing to happen? How can we achive this?
-        // possibly by clearing the keyboard events whenever a layer toggle happens?
     }
 
     #[test]

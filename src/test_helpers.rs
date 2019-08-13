@@ -1,12 +1,9 @@
 use crate::handlers::OnOff;
 #[allow(unused_imports)]
-use crate::key_codes::{KeyCode, AcceptsKeycode};
+use crate::key_codes::{AcceptsKeycode, KeyCode};
 #[allow(unused_imports)]
-use crate::{Keyboard};
-use crate::{
-    iter_unhandled_mut, Event, EventStatus, KeyboardState, ProcessKeys,
-    USBKeyOut, 
-};
+use crate::Keyboard;
+use crate::{iter_unhandled_mut, Event, EventStatus, KeyboardState, ProcessKeys, USBKeyOut};
 use alloc::sync::Arc;
 use no_std_compat::prelude::v1::*;
 use spin::RwLock;
@@ -65,6 +62,7 @@ impl USBKeyOut for KeyOutCatcher {
 pub fn check_output(keyboard: &Keyboard<KeyOutCatcher>, should: &[&[KeyCode]]) {
     if !(should.len() == keyboard.output.reports.len()) {
         dbg!(&keyboard.output.reports);
+        dbg!(&should);
     }
     assert!(should.len() == keyboard.output.reports.len());
     for (ii, report) in should.iter().enumerate() {

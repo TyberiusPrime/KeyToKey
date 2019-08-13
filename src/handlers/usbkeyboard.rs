@@ -1,5 +1,5 @@
 use crate::handlers::ProcessKeys;
-use crate::key_codes::{KeyCode, UNICODE_BELOW_256};
+use crate::key_codes::{KeyCode, UNICODE_BELOW_256, KeyCodeInfo};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::USBKeyOut;
@@ -20,11 +20,8 @@ impl USBKeyboard {
     pub fn new() -> USBKeyboard {
         USBKeyboard {}
     }
+}
 
-}
-fn is_usb_keycode(kc: u32) -> bool {
-    return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui
-}
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         //step 0: on key release, remove all prior key presses.
@@ -34,7 +31,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             //note that we're doing this in reverse, ie. releases happen before presses.
             match e {
                 Event::KeyRelease(kc) => {
-                    if is_usb_keycode(kc.keycode) {
+                    if kc.keycode.is_usb_keycode() {
                         if !codes_to_delete.contains(&kc.original_keycode) {
                             codes_to_delete.push(kc.original_keycode);
                         }
@@ -89,7 +86,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
                             modifiers_sent.set(3, true);
                         }
                     }
-                    if is_usb_keycode(kc.keycode) {
+                    if kc.keycode.is_usb_keycode() {
                         let oc: Result<KeyCode, String> = (kc.keycode).try_into();
                         match oc {
                             Ok(x) => {

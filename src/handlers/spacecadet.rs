@@ -52,8 +52,6 @@ impl<MAction: Action, MOnOff: OnOff> SpaceCadet<MAction, MOnOff> {
         }
     }
 }
-//todo: space cadet only on second keypress
-//todo: space cadet eats the tap in fast typing.
 impl<T: USBKeyOut, MAction: Action, MOnOff: OnOff> ProcessKeys<T> for SpaceCadet<MAction, MOnOff> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut any_other_seen = false;
