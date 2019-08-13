@@ -7,16 +7,21 @@ use no_std_compat::prelude::v1::*;
 /// that upon finish (ie. the release of the last key)
 /// sends first a (configurable) number of backspaces (to undo the input)
 /// and then an action.
-/// 
+///
 /// sequence keys - even if matching are not handled by Sequence,
-/// except if they're from the private range, in which 
+/// except if they're from the private range, in which
 /// case the Sequence will consume the Events.
-/// 
+///
 /// It is suggested to prefix your sequences with a unicode symbol,
 /// so you can observe the feedback.
-/// 
+///
 /// Note that for a final KeyCode::*, you will need to send a backspace,
 /// but for a final unicode (or private) one you don't.
+/// 
+/// Sequences that are prefixes of others require you to double
+/// up on the last key stroke of the prefix. Hitting it the first time
+/// triggers the prefix sequence, eating the keypress event,
+/// and the second time the longer sequence sees it and advances. 
 pub struct Sequence<'a, M> {
     sequence: &'a [u32],
     callback: M,
@@ -41,9 +46,14 @@ impl<'a, M: Action> Sequence<'a, M> {
 impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut codes_to_delete: Vec<u32> = Vec::new();
+        // we need to scan for handled key releases if we don't see any unhandled ones - 
+        // they might have triggered a different sequence, which set them to Handled
+        // but we still need to abort this one
+        let mut matched = false; 
         for (event, status) in iter_unhandled_mut(events).rev() {
             match event {
                 Event::KeyRelease(kc) => {
+                    matched = true;
                     if kc.keycode == self.sequence[self.pos as usize] {
                         if kc.keycode.is_private_keycode() {
                             *status = EventStatus::Handled;
@@ -61,8 +71,6 @@ impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
                                 codes_to_delete.push(kc.original_keycode);
                             }
                         }
-
-                    //todo: remove matching key pres
                     } else {
                         self.pos = 0;
                     }
@@ -71,11 +79,25 @@ impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
                     if codes_to_delete.contains(&kc.original_keycode) {
                         *status = EventStatus::Handled;
                     }
-                    if kc.keycode == self.sequence[self.pos as usize] && kc.keycode.is_private_keycode() {
+                    if kc.keycode == self.sequence[self.pos as usize]
+                        && kc.keycode.is_private_keycode()
+                    {
                         *status = EventStatus::Handled;
                     }
                 }
                 _ => {}
+            }
+        }
+        if !matched {
+            for (event, status) in events.iter() {
+                match event {
+                    Event::KeyRelease(kc) => {
+                        if kc.keycode != self.sequence[self.pos as usize] {
+                            self.pos = 0;
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -89,9 +111,7 @@ mod tests {
     use crate::key_codes::{KeyCode, UserKey};
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, Checks, KeyOutCatcher};
-    use crate::{
-        Keyboard, USBKeyOut, UnicodeSendMode,
-    };
+    use crate::{Keyboard, USBKeyOut, UnicodeSendMode};
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]
@@ -137,8 +157,6 @@ mod tests {
 
         k.pc(C, &[&[C]]);
         k.rc(C, &[&[BSpace], &[], &[BSpace], &[], &[BSpace], &[], &[X]]);
-
-
     }
 
     #[test]
@@ -161,7 +179,6 @@ mod tests {
 
         k.pc(C, &[&[C]]);
         k.rc(C, &[&[BSpace], &[], &[BSpace], &[], &[BSpace], &[], &[X]]);
-
     }
     #[test]
     fn test_sequence_private_trigger() {
@@ -202,11 +219,60 @@ mod tests {
         k.rc(UserKey::UK1, &[&[]]);
 
         k.pc(0x1234, &[&[]]);
-        k.rc(0x1234, &[
-            &[BSpace], &[], 
-            &[X]]);
+        k.rc(0x1234, &[&[BSpace], &[], &[X]]);
+    }
+    #[test]
+    fn test_dual_sequence() {
+        use crate::key_codes::KeyCode::*;
+        let map = &[A.to_u32(), B.to_u32()];
+        let map2 = &[A.to_u32(), C.to_u32()];
+        let l1 = Sequence::new(map, X, 2);
+        let l2 = Sequence::new(map2, Y, 1);
+        let mut k = Keyboard::new(KeyOutCatcher::new());
+        k.add_handler(Box::new(l1));
+        k.add_handler(Box::new(l2));
+
+        k.add_handler(Box::new(USBKeyboard::new()));
+
+        k.pc(A, &[&[A]]);
+        k.rc(A, &[&[]]);
+
+        k.pc(B, &[&[B]]);
+        k.rc(B, &[&[BSpace], &[], &[BSpace], &[], &[X]]);
+
+        k.pc(C, &[&[C]]);
+        k.rc(C, &[&[]]);
     }
 
+    #[test]
+    fn test_prefix_sequence() {
+        use crate::key_codes::KeyCode::*;
+        let map = &[A.to_u32(), B.to_u32()];
+        let map2 = &[A.to_u32(), B.to_u32(), C.to_u32()];
+        let l1 = Sequence::new(map, X, 2);
+        let l2 = Sequence::new(map2, Y, 3);
+        let mut k = Keyboard::new(KeyOutCatcher::new());
+        k.add_handler(Box::new(l1));
+        k.add_handler(Box::new(l2));
+
+        k.add_handler(Box::new(USBKeyboard::new()));
+
+        k.pc(A, &[&[A]]);
+        k.rc(A, &[&[]]);
+
+        k.pc(B, &[&[B]]);
+        k.rc(B, &[&[BSpace], &[], &[BSpace], &[], &[X]]);
+
+        k.pc(B, &[&[B]]);
+        k.rc(B, &[&[]]);
+
+        k.pc(C, &[&[C]]);
+        k.rc(C, &[
+            &[BSpace], &[], 
+            &[BSpace], &[], 
+            &[BSpace], &[], 
+            &[Y]]);
+    }
 
 
 }

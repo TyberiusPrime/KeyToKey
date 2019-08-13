@@ -10,6 +10,7 @@ pub struct Key {
                   //(or kept back by a different handler so far)
                   //bit1 is used to protect against double rewrites in Layers
                   //bit2 is used by SpaceCadet.
+                  //bit3 is used by Sequences
 }
 impl Key {
     pub fn new(keycode: u32) -> Key {

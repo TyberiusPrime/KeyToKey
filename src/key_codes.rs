@@ -334,7 +334,7 @@ pub enum UserKey {
 }
 
 impl UserKey {
-  pub const fn to_u32(self) -> u32 {
+    pub const fn to_u32(self) -> u32 {
         let u = self as u32;
         return u as u32;
     }
@@ -385,7 +385,7 @@ pub trait KeyCodeInfo {
 }
 
 impl KeyCodeInfo for u32 {
-    fn is_usb_keycode(self) -> bool{
+    fn is_usb_keycode(self) -> bool {
         return UNICODE_BELOW_256 <= self && self <= UNICODE_BELOW_256 + 0xE7; //RGui
     }
     fn is_private_keycode(self) -> bool {
