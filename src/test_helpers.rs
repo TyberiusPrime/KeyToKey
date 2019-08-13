@@ -1,7 +1,8 @@
 use crate::handlers::OnOff;
 use crate::key_codes::KeyCode;
 use crate::{
-    iter_unhandled_mut, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut,
+    iter_unhandled_mut, AcceptsKeycode, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys,
+    USBKeyOut,
 };
 use alloc::sync::Arc;
 use no_std_compat::prelude::v1::*;
@@ -33,6 +34,11 @@ impl USBKeyOut for KeyOutCatcher {
 
     fn ro_state(&self) -> &KeyboardState {
         return &self.state;
+    }
+
+    fn debug(&mut self, s: &str) {
+        #[cfg(test)]
+        println!("{}", s);
     }
 
     fn send_keys(&mut self, keys: &[KeyCode]) {
@@ -134,5 +140,29 @@ impl Debugger {
 impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
         println!("{}, {:?}", self.s, events);
+    }
+}
+
+#[cfg(test)]
+pub trait Checks {
+    /// press check
+    fn pc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]);
+    /// release and check
+    fn rc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]);
+}
+
+#[cfg(test)]
+impl Checks for Keyboard<'_, KeyOutCatcher> {
+    fn pc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]) {
+        self.add_keypress(key, 50);
+        self.handle_keys().unwrap();
+        check_output(self, should);
+        self.output.clear();
+    }
+    fn rc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]) {
+        self.add_keyrelease(key, 50);
+        self.handle_keys().unwrap();
+        check_output(self, should);
+        self.output.clear();
     }
 }

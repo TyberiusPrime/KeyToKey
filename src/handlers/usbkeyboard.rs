@@ -128,8 +128,9 @@ mod tests {
     use crate::handlers::USBKeyboard;
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
+    use crate::key_codes::KeyCode::*;
     #[allow(unused_imports)]
-    use crate::test_helpers::{check_output, KeyOutCatcher};
+    use crate::test_helpers::{check_output, Checks, KeyOutCatcher};
     use crate::Modifier::*;
     #[allow(unused_imports)]
     use crate::{
@@ -141,43 +142,17 @@ mod tests {
     fn test_usbkeyboard_single_key() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.add_keypress(KeyCode::A, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::A]]);
-        assert!(!keyboard.events.is_empty());
-        keyboard.add_keyrelease(KeyCode::A, 20);
-        assert!(keyboard.events.len() == 2);
-        keyboard.output.clear();
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        assert!(keyboard.events.is_empty());
+
+        keyboard.pc(A, &[&[A]]);
+        keyboard.rc(A, &[&[]]);
     }
+
     #[test]
     fn test_usbkeyboard_multiple_key() {
-        use crate::key_codes::KeyCode::*;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.add_keypress(A, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[A]]);
-        assert!(!keyboard.events.is_empty());
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[A, X]]);
-        assert!(!keyboard.events.is_empty());
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::A, 20);
-        assert!(keyboard.events.len() == 3);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[X]]);
-        assert!(!keyboard.events.is_empty());
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 20);
-        assert!(keyboard.events.len() == 2);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        assert!(keyboard.events.is_empty());
+        keyboard.pc(A, &[&[A]]);
+        keyboard.pc(X, &[&[A, X]]);
     }
     #[test]
     fn test_panic_on_unhandled() {
@@ -190,52 +165,27 @@ mod tests {
     fn test_modifiers_add_left_keycodes() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(USBKeyboard::new()));
-        keyboard.add_keypress(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Kb1]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
+        keyboard.pc(Kb1, &[&[Kb1]]);
+        keyboard.rc(Kb1, &[&[]]);
+
         keyboard.output.state().set_modifier(Shift, true);
-        keyboard.add_keypress(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LShift]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::LShift]]);
-        keyboard.output.clear();
+        keyboard.pc(Kb1, &[&[Kb1, LShift]]);
+        keyboard.rc(Kb1, &[&[LShift]]);
         keyboard.output.state().set_modifier(Shift, false);
+
         keyboard.output.state().set_modifier(Ctrl, true);
-        keyboard.add_keypress(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LCtrl]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::LCtrl]]);
-        keyboard.output.clear();
+        keyboard.pc(Kb1, &[&[Kb1, LCtrl]]);
+        keyboard.rc(Kb1, &[&[LCtrl]]);
+
         keyboard.output.state().set_modifier(Ctrl, false);
         keyboard.output.state().set_modifier(Alt, true);
-        keyboard.add_keypress(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LAlt]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::LAlt]]);
-        keyboard.output.clear();
+        keyboard.pc(Kb1, &[&[Kb1, LAlt]]);
+        keyboard.rc(Kb1, &[&[LAlt]]);
+
         keyboard.output.state().set_modifier(Alt, false);
         keyboard.output.state().set_modifier(Gui, true);
-        keyboard.add_keypress(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::Kb1, KeyCode::LGui]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::Kb1, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::LGui]]);
+        keyboard.pc(Kb1, &[&[Kb1, LGui]]);
+        keyboard.rc(Kb1, &[&[LGui]]);
     }
     #[test]
     fn test_modifiers_set_by_keycodes() {

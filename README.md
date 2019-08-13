@@ -51,3 +51,8 @@ Advanced Features working
   * TapDance (Count the number of taps on a key, pass the final count to a callback)
   * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
 
+
+
+Other rust firmwares / keyboard libraries
+
+* https://gitlab.com/polymer-kb/firmware/polymer

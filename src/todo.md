@@ -9,7 +9,8 @@ Open tasks:
  * Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
  * escapeOff to more general premade turn-the-layers off thing.
  * test and document space cadet only working by itself - not when any other key is pressed
- * layer SendStringShifted 
+ * layer SendStringShifted  test
+ * dvorak - replace with const something to safe on RAM
 
 
 

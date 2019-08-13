@@ -19,7 +19,7 @@ pub enum KeyCode {
     E,
     F,
     G,
-    H,
+    H, //11
     I,
     J,
     K,
@@ -211,6 +211,11 @@ impl KeyCode {
     pub fn to_u8(self) -> u8 {
         let u = (self as u32) - UNICODE_BELOW_256;
         return u as u8;
+    }
+
+    pub const fn to_u32(self) -> u32 {
+        let u = self as u32;
+        return u as u32;
     }
 }
 impl TryFrom<u8> for KeyCode {

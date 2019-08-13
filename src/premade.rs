@@ -1,3 +1,4 @@
+use crate::handlers::RewriteLayer;
 /// premade handlers for various occacions
 use crate::handlers::{Action, Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
@@ -36,54 +37,49 @@ pub fn toggle_handler(
 }
 /// A layer that maps qwerty to dvorak.
 /// Don't forget to enable it, layers are off by default
-pub fn dvorak<'a>() -> Box<Layer<'a>> {
-    use crate::handlers::LayerAction::RewriteTo;
+pub fn dvorak<'a>() -> Box<RewriteLayer> {
     use crate::key_codes::KeyCode::*;
-    Box::new(Layer::new(
-        vec![
-            (Q, Quote),
-            (W, Comma),
-            (E, Dot),
-            (R, P),
-            (T, Y),
-            (Y, F),
-            (U, G),
-            (I, C),
-            (O, R),
-            (P, L),
-            //(A, (A),
-            (S, O),
-            (D, E),
-            (F, U),
-            (G, I),
-            (H, D),
-            (J, H),
-            (K, T),
-            (L, N),
-            (SColon, S),
-            (Quote, Minus),
-            (Z, SColon),
-            (X, Q),
-            (C, J),
-            (V, K),
-            (B, X),
-            (N, B),
-            (M, M),
-            (Comma, W),
-            (Dot, V),
-            (Slash, Z),
-            //(BSlash, Bslash),
-            (Equal, RBracket),
-            (Quote, Minus),
-            (RBracket, Equal),
-            //(Grave, (Grave),
-            (Minus, LBracket),
-            (LBracket, Slash),
-        ]
-        .into_iter()
-        .map(|(f, t)| (f, RewriteTo(t.into())))
-        .collect(),
-    ))
+    const MAP: &[(u32, u32)] = &[
+        (Q.to_u32(), Quote.to_u32()),
+        (W.to_u32(), Comma.to_u32()),
+        (E.to_u32(), Dot.to_u32()),
+        (R.to_u32(), P.to_u32()),
+        (T.to_u32(), Y.to_u32()),
+        (Y.to_u32(), F.to_u32()),
+        (U.to_u32(), G.to_u32()),
+        (I.to_u32(), C.to_u32()),
+        (O.to_u32(), R.to_u32()),
+        (P.to_u32(), L.to_u32()),
+        //(A.to_u32(), (A.to_u32()),
+        (S.to_u32(), O.to_u32()),
+        (D.to_u32(), E.to_u32()),
+        (F.to_u32(), U.to_u32()),
+        (G.to_u32(), I.to_u32()),
+        (H.to_u32(), D.to_u32()),
+        (J.to_u32(), H.to_u32()),
+        (K.to_u32(), T.to_u32()),
+        (L.to_u32(), N.to_u32()),
+        (SColon.to_u32(), S.to_u32()),
+        (Quote.to_u32(), Minus.to_u32()),
+        (Z.to_u32(), SColon.to_u32()),
+        (X.to_u32(), Q.to_u32()),
+        (C.to_u32(), J.to_u32()),
+        (V.to_u32(), K.to_u32()),
+        (B.to_u32(), X.to_u32()),
+        (N.to_u32(), B.to_u32()),
+        (M.to_u32(), M.to_u32()),
+        (Comma.to_u32(), W.to_u32()),
+        (Dot.to_u32(), V.to_u32()),
+        (Slash.to_u32(), Z.to_u32()),
+        //(BSlash.to_u32(), Bslash.to_u32()),
+        (Equal.to_u32(), RBracket.to_u32()),
+        (Quote.to_u32(), Minus.to_u32()),
+        (RBracket.to_u32(), Equal.to_u32()),
+        //(Grave.to_u32(), (Grave.to_u32()),
+        (Minus.to_u32(), LBracket.to_u32()),
+        (LBracket.to_u32(), Slash.to_u32()),
+    ];
+    Box::new(RewriteLayer::new(MAP))
 }
 
 /// Enable/disable handler (layer) on activation/deactivation

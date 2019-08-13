@@ -10,8 +10,27 @@ pub enum LayerAction<'a> {
     RewriteToShifted(u32, u32),
     //todo: rewrite shift
     SendString(&'a str),
+    SendStringShifted(&'a str, &'a str),
     //    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
 }
+
+/// A layer either rewrites a key to another one
+/// or outputs a string upon key release.
+/// 
+/// It does this for multiple mappings at once,
+/// and it can consider the shift state, which 
+/// is very useful for unicode characters with lower
+/// and upper case.
+/// 
+/// Unfortunatly, Layers are memory inefficient,
+/// they keep their mapping in ram, and each mapping is at least
+/// 96 bits / 12 bytes.
+/// 
+/// Consider using a RewriteLayer instead if you don't need
+/// the string or Shift functionality.
+/// 
+/// 
+/// 
 pub struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
 }
@@ -57,6 +76,15 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     *status = EventStatus::Handled;
                                     break; //only one rewrite per layer
                                 }
+                                LayerAction::SendStringShifted(s1, s2) => {
+                                    if output.state().modifier(Shift) {
+                                        output.send_string(s2);
+                                    } else {
+                                        output.send_string(s1);
+                                    }
+                                    *status = EventStatus::Handled;
+                                    break; //only one rewrite per layer
+                                }
                             }
                         }
                     }
@@ -83,7 +111,8 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     }
                                     break; //only one rewrite per layer
                                 }
-                                LayerAction::SendString(_) => {
+                                LayerAction::SendString(_)
+                                | LayerAction::SendStringShifted(_, _) => {
                                     *status = EventStatus::Handled;
                                     break;
                                 }
@@ -113,7 +142,6 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
-    use core::convert::TryInto;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
     #[test]
@@ -216,7 +244,6 @@ mod tests {
     #[test]
     fn test_layer_double_rewrite() {
         use crate::handlers::LayerAction::RewriteTo;
-        use crate::AcceptsKeycode;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let l = Layer::new(vec![
             (KeyCode::A, RewriteTo(KeyCode::B.to_u32())),
@@ -233,7 +260,6 @@ mod tests {
     #[test]
     fn test_layer_disable_in_the_middle() {
         use crate::handlers::LayerAction::RewriteTo;
-        use crate::AcceptsKeycode;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let l = Layer::new(vec![(KeyCode::A, RewriteTo(KeyCode::B.to_u32()))]);
         let layer_id = keyboard.add_handler(Box::new(l));
@@ -256,7 +282,6 @@ mod tests {
     #[test]
     fn test_rewrite_shifted() {
         use crate::handlers::LayerAction::RewriteToShifted;
-        use crate::AcceptsKeycode;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let l = Layer::new(vec![(KeyCode::A, RewriteToShifted(0xC6, 0xF6))]);
         let layer_id = keyboard.add_handler(Box::new(l));
@@ -311,6 +336,5 @@ mod tests {
         keyboard.add_keyrelease(KeyCode::A, 0);
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::D], &[KeyCode::F], &[KeyCode::J]]);
-        panic!();
     }
 }

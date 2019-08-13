@@ -245,6 +245,8 @@ pub trait USBKeyOut {
     /// retrieve a mutable KeyboardState
     fn state(&mut self) -> &mut KeyboardState;
     fn ro_state(&self) -> &KeyboardState;
+    fn debug(&mut self, s: &str);
+
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {
             UnicodeSendMode::Linux => {
