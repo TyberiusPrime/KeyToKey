@@ -12,7 +12,7 @@ extern crate alloc;
 extern crate no_std_compat;
 extern crate spin;
 pub use crate::handlers::ProcessKeys;
-use crate::key_codes::UNICODE_BELOW_256;
+
 pub use crate::key_codes::{AcceptsKeycode, KeyCode, UserKey};
 use crate::key_stream::Key;
 pub use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};

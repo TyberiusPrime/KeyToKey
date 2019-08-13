@@ -1,6 +1,6 @@
 use crate::handlers::RewriteLayer;
 /// premade handlers for various occacions
-use crate::handlers::{Action, Layer, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
+use crate::handlers::{Action, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
@@ -37,7 +37,7 @@ pub fn toggle_handler(
 }
 /// A layer that maps qwerty to dvorak.
 /// Don't forget to enable it, layers are off by default
-pub fn dvorak<'a>() -> Box<RewriteLayer> {
+pub fn dvorak() -> Box<RewriteLayer> {
     use crate::key_codes::KeyCode::*;
     const MAP: &[(u32, u32)] = &[
         (Q.to_u32(), Quote.to_u32()),

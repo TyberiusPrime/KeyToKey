@@ -14,11 +14,13 @@ use smallbitvec::sbvec;
 /// Just map your keys to the usb keycodes.
 ///
 /// key repeat is whatever usb does...
+#[derive(Default)]
 pub struct USBKeyboard {}
 impl USBKeyboard {
     pub fn new() -> USBKeyboard {
         USBKeyboard {}
     }
+
 }
 fn is_usb_keycode(kc: u32) -> bool {
     return UNICODE_BELOW_256 <= kc && kc <= UNICODE_BELOW_256 + 0xE7; //RGui

@@ -1,8 +1,11 @@
 use crate::handlers::OnOff;
-use crate::key_codes::KeyCode;
+#[allow(unused_imports)]
+use crate::key_codes::{KeyCode, AcceptsKeycode};
+#[allow(unused_imports)]
+use crate::{Keyboard};
 use crate::{
-    iter_unhandled_mut, AcceptsKeycode, Event, EventStatus, Keyboard, KeyboardState, ProcessKeys,
-    USBKeyOut,
+    iter_unhandled_mut, Event, EventStatus, KeyboardState, ProcessKeys,
+    USBKeyOut, 
 };
 use alloc::sync::Arc;
 use no_std_compat::prelude::v1::*;
@@ -36,6 +39,7 @@ impl USBKeyOut for KeyOutCatcher {
         return &self.state;
     }
 
+    #[allow(unused_variables)]
     fn debug(&mut self, s: &str) {
         #[cfg(test)]
         println!("{}", s);

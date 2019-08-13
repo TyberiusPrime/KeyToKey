@@ -61,16 +61,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for RewriteLayer {
 //extern crate std;
 mod tests {
     use crate::handlers::{RewriteLayer, USBKeyboard, UnicodeKeyboard};
-    #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
-    #[allow(unused_imports)]
     use crate::test_helpers::{check_output, KeyOutCatcher};
-    use crate::Modifier::*;
-    #[allow(unused_imports)]
     use crate::{
-        Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
+        Keyboard, USBKeyOut, UnicodeSendMode,
     };
-    use core::convert::TryInto;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 

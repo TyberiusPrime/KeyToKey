@@ -10,6 +10,7 @@ use no_std_compat::prelude::v1::*;
 /// but some of them are intpreted as USB-Keycodes
 /// by UsbKeyboard.
 /// Use UserKey::* for totally custom keys
+#[derive(Default)]
 pub struct UnicodeKeyboard {}
 impl UnicodeKeyboard {
     pub fn new() -> UnicodeKeyboard {
