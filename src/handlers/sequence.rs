@@ -90,7 +90,7 @@ mod tests {
     #[allow(unused_imports)]
     use crate::test_helpers::{check_output, Checks, KeyOutCatcher};
     use crate::{
-        Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
+        Keyboard, USBKeyOut, UnicodeSendMode,
     };
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;

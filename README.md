@@ -45,10 +45,10 @@ Advanced Features working
  * StickyMacros (Tap once to activate, again to deactivate){
  * OneShots (Press -> activate, deactivates after next any-not-one-shot key press - useful for modifiers or temporarily activated layers)
  * SpaceCadet (Do one thing on press-and-hold, a different thing on tap. For example a shift key that also outputs a '('))
+ * Sequences (which don't intercept the keycodes, but then send a set of backspace presses, and then your action)
 
  Advanced features planned
   * Leader sequences (e.g. hit `leader` h e a r t to enter a heart emoji, or an arbitrary string)
-  * Leader-less sequences (which don't intercept the keycodes, but then send a set of backspace presses, and then your action)
   * TapDance (Count the number of taps on a key, pass the final count to a callback)
   * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
 

@@ -1,5 +1,5 @@
 use crate::handlers::ProcessKeys;
-use crate::key_codes::{KeyCode, UNICODE_BELOW_256, KeyCodeInfo};
+use crate::key_codes::{KeyCode, KeyCodeInfo};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::USBKeyOut;
