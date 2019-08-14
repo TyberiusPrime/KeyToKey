@@ -17,11 +17,11 @@ use no_std_compat::prelude::v1::*;
 ///
 /// Note that for a final KeyCode::*, you will need to send a backspace,
 /// but for a final unicode (or private) one you don't.
-/// 
+///
 /// Sequences that are prefixes of others require you to double
 /// up on the last key stroke of the prefix. Hitting it the first time
 /// triggers the prefix sequence, eating the keypress event,
-/// and the second time the longer sequence sees it and advances. 
+/// and the second time the longer sequence sees it and advances.
 pub struct Sequence<'a, M> {
     sequence: &'a [u32],
     callback: M,
@@ -46,10 +46,10 @@ impl<'a, M: Action> Sequence<'a, M> {
 impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         let mut codes_to_delete: Vec<u32> = Vec::new();
-        // we need to scan for handled key releases if we don't see any unhandled ones - 
+        // we need to scan for handled key releases if we don't see any unhandled ones -
         // they might have triggered a different sequence, which set them to Handled
         // but we still need to abort this one
-        let mut matched = false; 
+        let mut matched = false;
         for (event, status) in iter_unhandled_mut(events).rev() {
             match event {
                 Event::KeyRelease(kc) => {
@@ -89,7 +89,7 @@ impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
             }
         }
         if !matched {
-            for (event, status) in events.iter() {
+            for (event, _status) in events.iter() {
                 match event {
                     Event::KeyRelease(kc) => {
                         if kc.keycode != self.sequence[self.pos as usize] {
@@ -267,12 +267,6 @@ mod tests {
         k.rc(B, &[&[]]);
 
         k.pc(C, &[&[C]]);
-        k.rc(C, &[
-            &[BSpace], &[], 
-            &[BSpace], &[], 
-            &[BSpace], &[], 
-            &[Y]]);
+        k.rc(C, &[&[BSpace], &[], &[BSpace], &[], &[BSpace], &[], &[Y]]);
     }
-
-
 }

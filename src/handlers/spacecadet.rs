@@ -28,6 +28,12 @@ enum SpaceCadetState {
 /// the layer they toggle (if used with a layer),
 /// so you will have to use keyboard.future_handler_id(2)
 /// for the handler id in premade::spacecadet_handler
+///
+/// Please note if you want a premade::one_shot_* (modifier) to
+/// work correctly with a space cadet,
+/// the one_shot must come first in the list of handlers
+/// otherwise it will only work like a regular modifier with the space
+/// cadet trigger.
 pub struct SpaceCadet<MAction, MOnOff> {
     trigger: u32,
     action: MAction,
@@ -319,6 +325,30 @@ mod tests {
         check_output(&keyboard, &[&[]]);
         assert!(!keyboard.output.state().is_handler_enabled(numpad_id));
         keyboard.output.clear();
+    }
+
+    #[test]
+    fn test_space_cadet_oneshot_interaction() {
+        use crate::premade;
+        use crate::test_helpers::Checks;
+        use crate::Modifier::Shift;
+
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let l = SpaceCadet::new(KeyCode::X, KeyCode::X, counter.clone());
+        let mut k = Keyboard::new(KeyOutCatcher::new());
+        k.add_handler(premade::one_shot_shift(400, 1000));
+        k.add_handler(Box::new(l));
+        k.add_handler(Box::new(USBKeyboard::new()));
+
+        k.pc(KeyCode::RShift, &[&[KeyCode::LShift]]); // remember, one shots always output the left.
+        k.rc(KeyCode::RShift, &[&[KeyCode::LShift]]); //shift stays pressed by the one shot.
+
+        assert!(k.output.state().modifier(Shift));
+        k.pc(KeyCode::X, &[&[KeyCode::LShift]]);
+        k.rc(KeyCode::X, &[&[KeyCode::LShift, KeyCode::X]]);
     }
 
     /*

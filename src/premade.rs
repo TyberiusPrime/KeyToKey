@@ -98,6 +98,8 @@ impl OnOff for ActionHandler {
     }
 }
 /// make the shift keys behave as a OneShot
+/// 
+/// hint: use before space cadet
 pub fn one_shot_shift(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionHandler>> {
     Box::new(OneShot::new(
         KeyCode::LShift,
@@ -110,6 +112,8 @@ pub fn one_shot_shift(held_timeout: u16, released_timeout: u16) -> Box<OneShot<A
     ))
 }
 /// make the ctrl keys behave as a OneShot
+/// 
+/// hint: use before space cadet
 pub fn one_shot_ctrl(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionHandler>> {
     Box::new(OneShot::new(
         KeyCode::LCtrl,
@@ -122,6 +126,8 @@ pub fn one_shot_ctrl(held_timeout: u16, released_timeout: u16) -> Box<OneShot<Ac
     ))
 }
 /// make the alt keys behave as a OneShot
+/// 
+/// hint: use before space cadet
 pub fn one_shot_alt(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionHandler>> {
     Box::new(OneShot::new(
         KeyCode::LAlt,
@@ -134,6 +140,8 @@ pub fn one_shot_alt(held_timeout: u16, released_timeout: u16) -> Box<OneShot<Act
     ))
 }
 /// make the gui/windows key behave as a OneShot
+/// 
+/// hint: use before space cadet
 pub fn one_shot_gui(held_timeout: u16, released_timeout: u16) -> Box<OneShot<ActionHandler>> {
     Box::new(OneShot::new(
         KeyCode::LGui,

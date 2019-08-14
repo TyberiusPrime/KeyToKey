@@ -10,14 +10,9 @@ Open tasks:
  * escapeOff to more general premade turn-the-layers off thing.
  * test and document space cadet only working by itself - not when any other key is pressed
  * layer SendStringShifted  test
- * dvorak - replace with const something to safe on RAM
- * interaction of space cadet and one shot - oneshot degenrates into modifier?
-
-
 
 
 Sort: 
-// shift remaps on layers (ie. disassociate the premade shift-combos) testing
 // combos
 // tapdance enhancemeants, on_each_tap, and max_taps?
 // toggle on x presses? - should be a tapdance impl?
@@ -36,3 +31,5 @@ Done
  * TapAndLongTap functionality
  * correctly handle layer on/off while a key is depressed
  * debug spacecadet (actually a new implementation, but it seems to work ok)
+ * interaction of space cadet and one shot - oneshot degenrates into modifier? - oneshot must come first
+ * dvorak - replace with const something to safe on RAM
