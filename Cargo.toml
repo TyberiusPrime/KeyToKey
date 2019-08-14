@@ -1,6 +1,6 @@
 [package]
 name = "keytokey"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tyberius Prime <tyberius_prime@coonabibba.de>"]
 edition = "2018"
 

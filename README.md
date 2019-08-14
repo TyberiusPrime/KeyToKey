@@ -1,6 +1,6 @@
 # KeyToKey
 
-KeyToKey is a Rust libary for building keyboard firmwares.
+KeyToKey (K2K) is a Rust libary for building keyboard firmwares.
 
 Basically, a keyboard firmware 
   a) reads key-presses, 
@@ -28,10 +28,12 @@ and the rest of the private area is free to be used by the keyboard implementor.
 
 A basic keyboard uses two handlers - a handlers::UnicodeKeyboard, which sends
 the OS-specific magic 'enter-an-arbitrary-unicode-keypoint' for any key code outside
-of the private areas, and a handlers::USBKeyboard which handels all the usual
+of the private areas, and a handlers::USBKeyboard which handles all the usual
 'tell the computer which buttons are pressed' functionality including modifiers. 
-USBKeyboard does not limit the number of simultanious keys, but the downstream translation into USB might restrict
-to the usual 6 key rollover.
+
+USBKeyboard does not limit the number of simultanious keys, but the
+downstream translation into USB might restrict to the usual 6 key rollover.
+
 
 
 Basic features
@@ -45,13 +47,16 @@ Advanced Features working
  * StickyMacros (Tap once to activate, again to deactivate){
  * OneShots (Press -> activate, deactivates after next any-not-one-shot key press - useful for modifiers or temporarily activated layers)
  * SpaceCadet (Do one thing on press-and-hold, a different thing on tap. For example a shift key that also outputs a '('))
- * Sequences (which don't intercept the keycodes, but then send a set of backspace presses, and then your action)
+ * Sequences (e.g. ```t e h``` -> ```the``` which don't intercept the keycodes, but then send a set of backspace presses, and then your action)
 
  Advanced features planned
-  * Leader sequences (e.g. hit `leader` h e a r t to enter a heart emoji, or an arbitrary string)
-  * TapDance (Count the number of taps on a key, pass the final count to a callback)
+  * Leader sequences (e.g. hit ```leader h e a r t``` to enter a heart emoji, or an arbitrary string)
+  * TapDance (count the number of taps on a key, pass the final count to a callback)
   * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
 
+
+K2K strives to seperate the triggers (when does something happen) from the actual actions.
+Currently actions may be arbitrary (USB) KeyCodes being registered, &str being send or callbacks (implemented via traits)
 
 
 Other rust firmwares / keyboard libraries

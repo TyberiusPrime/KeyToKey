@@ -10,6 +10,10 @@ Open tasks:
  * escapeOff to more general premade turn-the-layers off thing.
  * test and document space cadet only working by itself - not when any other key is pressed
  * layer SendStringShifted  test
+ * figure out how to send long strings - currently they readily explode the available ram,
+   since each record is 8 bytes, and each character creates 4-12 records, so 72 characters is 2304..6912 bytes!
+
+ * space cadet + dvorak apperantly blocks key repeat for non-trigger key?
 
 
 Sort: 
