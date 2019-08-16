@@ -97,14 +97,14 @@ pub enum KeyCode {
     KpMinus,
     KpPlus,
     KpEnter,
-    Kp1,
+    Kp1, //89
     Kp2,
     Kp3,
     Kp4,
     Kp5,
-    Kp6,
+    Kp6, //94
     Kp7,
-    Kp8, // 0x60
+    Kp8, // 0x60 - 96
     Kp9,
     Kp0,
     KpDot,
@@ -165,8 +165,8 @@ pub enum KeyCode {
     KpLeftParen = 0xb6 + UNICODE_BELOW_256, // Keypad (
     KpRightParen,                           // 0xb7 // Keypad )
     // Modifiers
-    LCtrl = 0xE0 + UNICODE_BELOW_256,
-    LShift,
+    LCtrl = 0xE0 + UNICODE_BELOW_256, //224
+    LShift, //225
     LAlt,
     LGui,
     RCtrl,

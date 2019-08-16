@@ -337,4 +337,41 @@ mod tests {
         keyboard.handle_keys().unwrap();
         check_output(&keyboard, &[&[KeyCode::D], &[KeyCode::F], &[KeyCode::J]]);
     }
+
+    #[test]
+    fn test_rewrite_shifted_string() {
+        use crate::handlers::LayerAction::SendStringShifted;
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let l = Layer::new(vec![(KeyCode::A, SendStringShifted("a", "A"))]);
+        let layer_id = keyboard.add_handler(Box::new(l));
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.output.state().unicode_mode = UnicodeSendMode::Debug;
+        keyboard.add_handler(Box::new(crate::test_helpers::Debugger::new("A")));
+        keyboard.add_handler(Box::new(UnicodeKeyboard::new()));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[]]);
+        keyboard.output.clear();
+
+        keyboard.add_keyrelease(KeyCode::A, 0);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[&[KeyCode::Kp6], &[KeyCode::Kp1], &[]]);
+        keyboard.output.clear();
+
+        keyboard.output.state().set_modifier(Shift, true);
+        keyboard.add_keypress(KeyCode::A, 0);
+        keyboard.add_keyrelease(KeyCode::A, 0);
+
+        keyboard.handle_keys().unwrap();
+        check_output(
+            &keyboard,
+            &[&[KeyCode::Kp4], &[KeyCode::Kp1], &[KeyCode::LShift] ], //the shift get's send from the USBKeyboard instead of an empty report...
+        );
+        keyboard.output.clear();
+    }
+
+
 }

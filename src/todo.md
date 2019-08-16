@@ -3,13 +3,12 @@ Open tasks:
  * rework leader
  * debug&rework tapdance
  * improve readme
- * Layers: Allow passing triggers - Unfortunatly, you can't just use Trigger,
+ * Layers: Allow passing triggers/action - Unfortunatly, you can't just use Trigger,
    since the impl USBKeyOut means it's generic, and turning
    it into a Trigger<T: USBKeyOut>  bubbles the output type into the LayerAction, then into the Layer, and then we run into some Sync/Send issue that I can't fathom
  * Consider passing absolute times so that LongTap can work no matter what other keys are pressed inbetween
  * escapeOff to more general premade turn-the-layers off thing.
  * test and document space cadet only working by itself - not when any other key is pressed
- * layer SendStringShifted  test
  * figure out how to send long strings - currently they readily explode the available ram,
    since each record is 8 bytes, and each character creates 4-12 records, so 72 characters is 2304..6912 bytes!
 
@@ -37,3 +36,4 @@ Done
  * debug spacecadet (actually a new implementation, but it seems to work ok)
  * interaction of space cadet and one shot - oneshot degenrates into modifier? - oneshot must come first
  * dvorak - replace with const something to safe on RAM
+ * layer SendStringShifted test
