@@ -89,6 +89,11 @@ pub fn dvorak() -> Box<RewriteLayer> {
 pub struct ActionHandler {
     id: HandlerID,
 }
+impl ActionHandler {
+    pub fn new(id: HandlerID) -> ActionHandler {
+        ActionHandler{id}
+    }
+}
 impl OnOff for ActionHandler {
     fn on_activate(&mut self, output: &mut impl USBKeyOut) {
         output.state().enable_handler(self.id);
@@ -112,6 +117,7 @@ pub fn one_shot_shift(held_timeout: u16, released_timeout: u16) -> Box<OneShot<A
         released_timeout,
     ))
 }
+
 /// make the ctrl keys behave as a OneShot
 /// 
 /// hint: use before space cadet

@@ -13,7 +13,8 @@ Open tasks:
    since each record is 8 bytes, and each character creates 4-12 records, so 72 characters is 2304..6912 bytes!
 
  * space cadet + dvorak apperantly blocks key repeat for non-trigger key?
-
+ * use oneshot double tap to trigger another oneshot...
+ * teach the premade::one_shot helpers to offer double taps / seperatly per modifier key
 
 Sort: 
 // combos
