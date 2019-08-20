@@ -37,3 +37,4 @@ Done
  * interaction of space cadet and one shot - oneshot degenrates into modifier? - oneshot must come first
  * dvorak - replace with const something to safe on RAM
  * layer SendStringShifted test
+ * oneshot + double tap key (ie. a one shot until you double tap it..)

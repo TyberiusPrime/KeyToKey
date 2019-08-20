@@ -1,4 +1,4 @@
-use crate::handlers::{OnOff, ProcessKeys};
+use crate::handlers::{OnOff, ProcessKeys, Action};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -18,6 +18,8 @@ pub enum OneShotStatus {
 /// press it, on_activate will be called,
 /// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
+/// Also, if the OneShot trigger is pressed again on_double_tap is called 
+/// (after callbacks.on_deactivate, use ActionNone for no action)
 ///
 /// If held_timeout is > 0 and the key is pressed for at least that many ms,
 /// and on_deactivate will be called upon release. This typically is useful
@@ -31,39 +33,42 @@ pub enum OneShotStatus {
 /// just pass in Keycode::No if you want one trigger to be ignored
 /// note that the oneshots always lead to the left variant of the modifier being sent,
 /// even if they're being triggered by the right one.
-pub struct OneShot<M> {
+pub struct OneShot<M1, M2> {
     trigger1: u32,
     trigger2: u32,
-    callbacks: M,
+    callbacks: M1,
+    on_double_tap: M2,
     status: OneShotStatus,
     held_timeout: u16,
     released_timeout: u16,
 }
 lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
-    static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
+    pub static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
 }
-impl<M: OnOff> OneShot<M> {
+impl<M1: OnOff, M2: Action> OneShot<M1, M2> {
     pub fn new(
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
-        callbacks: M,
+        callbacks: M1,
+        on_double_tap: M2,
         held_timeout: u16,
         released_timeout: u16,
-    ) -> OneShot<M> {
+    ) -> OneShot<M1, M2> {
         ONESHOT_TRIGGERS.write().push(trigger1.to_u32());
         ONESHOT_TRIGGERS.write().push(trigger2.to_u32());
         OneShot {
             trigger1: trigger1.to_u32(),
             trigger2: trigger2.to_u32(),
             callbacks,
+            on_double_tap,
             status: OneShotStatus::Off,
             held_timeout,
             released_timeout,
         }
     }
 }
-impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for OneShot<M> {
+impl<T: USBKeyOut, M1: OnOff, M2: Action> ProcessKeys<T> for OneShot<M1, M2> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
@@ -78,7 +83,8 @@ impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for OneShot<M> {
                         match self.status {
                             OneShotStatus::Triggered => {
                                 self.status = OneShotStatus::Off;
-                                self.callbacks.on_deactivate(output)
+                                self.callbacks.on_deactivate(output);
+                                self.on_double_tap.on_trigger(output);
                             }
                             OneShotStatus::Off => {
                                 self.status = OneShotStatus::Held;
@@ -155,6 +161,7 @@ mod tests {
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
+    use crate::premade::ActionNone;
     use alloc::sync::Arc;
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
@@ -165,7 +172,7 @@ mod tests {
             down_counter: 0,
             up_counter: 0,
         }));
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), 0, 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, 0, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -329,7 +336,7 @@ mod tests {
             up_counter: 0,
         }));
         let timeout = 1000;
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), timeout, 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, timeout, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -354,4 +361,36 @@ mod tests {
             assert!(keyboard.events.is_empty());
         }
     }
+
+    #[test]
+    fn test_oneshot_double_tap() {
+        use crate::key_codes::KeyCode::*;
+        use crate::handlers::Action;
+        use crate::test_helpers::Checks;
+        let counter = Arc::new(RwLock::new(PressCounter {
+            down_counter: 0,
+            up_counter: 0,
+        }));
+        let timeout = 1000;
+        struct MyAction {}
+        impl Action for MyAction { 
+            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+                output.send_keys(&[KeyCode::A]);
+            }
+        }
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), MyAction{}, timeout, 0);
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        keyboard.add_handler(Box::new(t));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        let trigger = UserKey::UK1;
+        keyboard.pc(trigger, &[&[H], &[]]);
+        keyboard.rc(trigger, &[&[]]);
+        keyboard.pc(trigger, &[&[I], &[A], &[]]);
+        keyboard.rc(trigger, &[&[]]);
+
+        assert!(counter.read().down_counter == 1);
+        assert!(counter.read().up_counter == 1);
+    }
+
 }
