@@ -18,7 +18,8 @@ pub enum OneShotStatus {
 /// press it, on_activate will be called,
 /// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
-/// Also, if the OneShot trigger is pressed again on_double_tap is called 
+/// 
+/// Also, if the OneShot trigger is pressed again on_double_tap_triggerX is called 
 /// (after callbacks.on_deactivate, use ActionNone for no action)
 ///
 /// If held_timeout is > 0 and the key is pressed for at least that many ms,
@@ -29,15 +30,16 @@ pub enum OneShotStatus {
 /// You may also define a released_timeout - after this time, without
 /// a different keypress, the OneShot will also deactivate
 ///
-/// OneShots have two triggers to accomidate the usual left/right modifier keys,
+/// OneShots have two triggers to accomodate the usual left/right modifier keys,
 /// just pass in Keycode::No if you want one trigger to be ignored
 /// note that the oneshots always lead to the left variant of the modifier being sent,
 /// even if they're being triggered by the right one.
-pub struct OneShot<M1, M2> {
+pub struct OneShot<M1, M2, M3> {
     trigger1: u32,
     trigger2: u32,
     callbacks: M1,
-    on_double_tap: M2,
+    on_double_tap_trigger1: M2,
+    on_double_tap_trigger2: M3,
     status: OneShotStatus,
     held_timeout: u16,
     released_timeout: u16,
@@ -46,29 +48,31 @@ lazy_static! {
     /// oneshots don't deactive on other oneshots - this stores the keycodes to ignore
     pub static ref ONESHOT_TRIGGERS: RwLock<Vec<u32>> = RwLock::new(Vec::new());
 }
-impl<M1: OnOff, M2: Action> OneShot<M1, M2> {
+impl<M1: OnOff, M2: Action, M3: Action> OneShot<M1, M2, M3> {
     pub fn new(
         trigger1: impl AcceptsKeycode,
         trigger2: impl AcceptsKeycode,
         callbacks: M1,
-        on_double_tap: M2,
+        on_double_tap_trigger1: M2,
+        on_double_tap_trigger2: M3,
         held_timeout: u16,
         released_timeout: u16,
-    ) -> OneShot<M1, M2> {
+    ) -> OneShot<M1, M2, M3> {
         ONESHOT_TRIGGERS.write().push(trigger1.to_u32());
         ONESHOT_TRIGGERS.write().push(trigger2.to_u32());
         OneShot {
             trigger1: trigger1.to_u32(),
             trigger2: trigger2.to_u32(),
             callbacks,
-            on_double_tap,
+            on_double_tap_trigger1,
+            on_double_tap_trigger2,
             status: OneShotStatus::Off,
             held_timeout,
             released_timeout,
         }
     }
 }
-impl<T: USBKeyOut, M1: OnOff, M2: Action> ProcessKeys<T> for OneShot<M1, M2> {
+impl<T: USBKeyOut, M1: OnOff, M2: Action, M3: Action> ProcessKeys<T> for OneShot<M1, M2, M3> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
@@ -84,7 +88,11 @@ impl<T: USBKeyOut, M1: OnOff, M2: Action> ProcessKeys<T> for OneShot<M1, M2> {
                             OneShotStatus::Triggered => {
                                 self.status = OneShotStatus::Off;
                                 self.callbacks.on_deactivate(output);
-                                self.on_double_tap.on_trigger(output);
+                                if kc.keycode == self.trigger1 {
+                                    self.on_double_tap_trigger1.on_trigger(output);
+                                } else if kc.keycode == self.trigger2 {
+                                    self.on_double_tap_trigger2.on_trigger(output);
+                                }
                             }
                             OneShotStatus::Off => {
                                 self.status = OneShotStatus::Held;
@@ -172,7 +180,7 @@ mod tests {
             down_counter: 0,
             up_counter: 0,
         }));
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, 0, 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, ActionNone{}, 0, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -336,7 +344,7 @@ mod tests {
             up_counter: 0,
         }));
         let timeout = 1000;
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, timeout, 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), ActionNone{}, ActionNone{}, timeout, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -372,18 +380,20 @@ mod tests {
             up_counter: 0,
         }));
         let timeout = 1000;
-        struct MyAction {}
+        struct MyAction {
+            keycode: KeyCode
+        }
         impl Action for MyAction { 
             fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
-                output.send_keys(&[KeyCode::A]);
+                output.send_keys(&[self.keycode]);
             }
         }
-        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), MyAction{}, timeout, 0);
+        let t = OneShot::new(UserKey::UK0, UserKey::UK1, counter.clone(), MyAction{keycode: A}, MyAction{keycode:B}, timeout, 0);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(t));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 
-        let trigger = UserKey::UK1;
+        let trigger = UserKey::UK0;
         keyboard.pc(trigger, &[&[H], &[]]);
         keyboard.rc(trigger, &[&[]]);
         keyboard.pc(trigger, &[&[I], &[A], &[]]);
@@ -391,6 +401,15 @@ mod tests {
 
         assert!(counter.read().down_counter == 1);
         assert!(counter.read().up_counter == 1);
+
+        let trigger = UserKey::UK1;
+        keyboard.pc(trigger, &[&[H], &[]]);
+        keyboard.rc(trigger, &[&[]]);
+        keyboard.pc(trigger, &[&[I], &[B], &[]]);
+        keyboard.rc(trigger, &[&[]]);
+
+        assert!(counter.read().down_counter == 2);
+        assert!(counter.read().up_counter == 2);
     }
 
 }
