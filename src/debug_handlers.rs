@@ -1,4 +1,4 @@
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::KeyCode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -49,7 +49,7 @@ fn transform_u32_to_keycodes(x: u32) -> [KeyCode; 8] {
 /// keyboard after pressing a key and later sort by
 pub struct TranslationHelper {}
 impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         for (e, status) in iter_unhandled_mut(events) {
             *status = EventStatus::Handled;
             match e {
@@ -70,6 +70,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for TranslationHelper {
                 }
             };
         }
+    HandlerResult::NoOp
     }
 }
 /// Debug a keystream at any point in the handling
@@ -81,7 +82,7 @@ pub struct DebugStream<F> {
     write_callback: F,
 }
 impl<T: USBKeyOut, F: FnMut(String)> ProcessKeys<T> for DebugStream<F> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) ->HandlerResult {
         if !events.is_empty() {
             (self.write_callback)("[\n".to_string());
             for (e, status) in events.iter() {
@@ -113,6 +114,7 @@ impl<T: USBKeyOut, F: FnMut(String)> ProcessKeys<T> for DebugStream<F> {
                 }
             }
         }
+        HandlerResult::NoOp
     }
 }
 #[cfg(test)]

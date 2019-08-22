@@ -1,4 +1,4 @@
-use crate::handlers::{Action, OnOff, ProcessKeys};
+use crate::handlers::{Action, OnOff, ProcessKeys, HandlerResult};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -59,7 +59,7 @@ impl<MAction: Action, MOnOff: OnOff> SpaceCadet<MAction, MOnOff> {
     }
 }
 impl<T: USBKeyOut, MAction: Action, MOnOff: OnOff> ProcessKeys<T> for SpaceCadet<MAction, MOnOff> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         let mut any_other_seen = false;
         for (event, status) in iter_unhandled_mut(events) {
             match event {
@@ -113,6 +113,7 @@ impl<T: USBKeyOut, MAction: Action, MOnOff: OnOff> ProcessKeys<T> for SpaceCadet
                 _ => {}
             }
         }
+    HandlerResult::NoOp
     }
 }
 
@@ -302,7 +303,8 @@ mod tests {
             (KeyCode::Space, RT(KeyCode::Tab.into())),
             (KeyCode::Down, RT(KeyCode::Dot.into())),
             (KeyCode::LBracket, RT(KeyCode::Comma.into())),
-        ])));
+        ],crate::handlers::AutoOff::No
+        )));
         keyboard.output.state().disable_handler(numpad_id);
         keyboard.add_handler(Box::new(USBKeyboard::new()));
 

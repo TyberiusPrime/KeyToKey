@@ -1,4 +1,4 @@
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 
@@ -10,7 +10,7 @@ use no_std_compat::prelude::v1::*;
 /// The advantage of this is that you can/must use it with a const
 /// array (slice), which greatly saves on ram compared to Layer
 /// (e.g. premade::dvorak)
-///
+/// 
 pub struct RewriteLayer {
     rewrites: &'static [(u32, u32)],
 }
@@ -22,7 +22,7 @@ impl RewriteLayer {
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for RewriteLayer {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T)->HandlerResult {
         for (event, _status) in iter_unhandled_mut(events) {
             //events.iter_mut() {
             match event {
@@ -51,6 +51,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for RewriteLayer {
                 Event::TimeOut(_) => {}
             }
         }
+        HandlerResult::NoOp
     }
     fn default_enabled(&self) -> bool {
         false
@@ -63,7 +64,9 @@ mod tests {
     use crate::handlers::{RewriteLayer, USBKeyboard, UnicodeKeyboard};
     use crate::key_codes::KeyCode;
     use crate::test_helpers::{check_output, KeyOutCatcher};
-    use crate::{Keyboard, USBKeyOut, UnicodeSendMode};
+    use crate::{
+        Keyboard, USBKeyOut, UnicodeSendMode,
+    };
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
 

@@ -1,4 +1,4 @@
-use crate::handlers::{OnOff, ProcessKeys, Action};
+use crate::handlers::{OnOff, ProcessKeys, Action, HandlerResult};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -73,7 +73,7 @@ impl<M1: OnOff, M2: Action, M3: Action> OneShot<M1, M2, M3> {
     }
 }
 impl<T: USBKeyOut, M1: OnOff, M2: Action, M3: Action> ProcessKeys<T> for OneShot<M1, M2, M3> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
             // on press if not active -> active
@@ -153,6 +153,7 @@ impl<T: USBKeyOut, M1: OnOff, M2: Action, M3: Action> ProcessKeys<T> for OneShot
                 }
             }
         }
+        HandlerResult::NoOp
     }
 }
 

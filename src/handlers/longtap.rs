@@ -1,5 +1,5 @@
 use crate::handlers::Action;
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -37,7 +37,7 @@ impl<M1: Action, M2: Action> LongTap<M1, M2> {
 /// the time from the last key-event withouth considering
 /// whether that was actually the press of the LongTap key
 impl<T: USBKeyOut, M1: Action, M2: Action> ProcessKeys<T> for LongTap<M1, M2> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         for (event, status) in iter_unhandled_mut(events).rev() {
             match event {
                 Event::KeyRelease(kc) => {
@@ -59,6 +59,7 @@ impl<T: USBKeyOut, M1: Action, M2: Action> ProcessKeys<T> for LongTap<M1, M2> {
                 _ => {}
             }
         }
+    HandlerResult::NoOp
     }
 }
 

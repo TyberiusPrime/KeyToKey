@@ -11,7 +11,7 @@ pub mod test_helpers;
 extern crate alloc;
 extern crate no_std_compat;
 extern crate spin;
-pub use crate::handlers::ProcessKeys;
+pub use crate::handlers::{ProcessKeys, HandlerResult};
 
 pub use crate::key_codes::{AcceptsKeycode, KeyCode, UserKey};
 use crate::key_stream::Key;
@@ -128,7 +128,12 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         //skip the modifiers
         for (ii, h) in self.handlers.iter_mut().enumerate() {
             if self.output.state().modifiers_and_enabled_handlers[ii + 4] {
-                h.process_keys(&mut self.events, &mut self.output);
+                match h.process_keys(&mut self.events, &mut self.output) {
+                    HandlerResult::NoOp => {},
+                    HandlerResult::Disable => {
+                        self.output.state().disable_handler((ii + 4) as HandlerID);
+                    }
+                }
             }
         }
         // remove handled & timeout events.

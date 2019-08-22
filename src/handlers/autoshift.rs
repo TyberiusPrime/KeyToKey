@@ -1,4 +1,4 @@
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::KeyCode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -30,7 +30,7 @@ impl AutoShift {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         let mut presses = Vec::new();
         let mut handled = Vec::new();
         for (event, status) in iter_unhandled_mut(events) {
@@ -72,6 +72,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for AutoShift {
                 }
             }
         }
+    HandlerResult::NoOp
     }
 }
 #[cfg(test)]

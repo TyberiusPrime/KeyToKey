@@ -1,4 +1,4 @@
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::{KeyCode, KeyCodeInfo};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
@@ -23,7 +23,7 @@ impl USBKeyboard {
 }
 
 impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T)->HandlerResult {
         //step 0: on key release, remove all prior key presses.
         let mut codes_to_delete: Vec<u32> = Vec::new();
         let mut modifiers_sent = sbvec![false; 4];
@@ -118,6 +118,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for USBKeyboard {
             output.register_key(KeyCode::LGui);
         }
         output.send_registered();
+        HandlerResult::NoOp
     }
 }
 #[cfg(test)]

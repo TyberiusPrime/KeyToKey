@@ -1,5 +1,5 @@
 use crate::handlers::OnOff;
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
@@ -23,7 +23,7 @@ impl<M: OnOff> PressReleaseMacro<M> {
     }
 }
 impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for PressReleaseMacro<M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
@@ -41,6 +41,7 @@ impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for PressReleaseMacro<M> {
                 Event::TimeOut(_) => {}
             }
         }
+    HandlerResult::NoOp
     }
 }
 
@@ -65,7 +66,7 @@ impl<M: OnOff> StickyMacro<M> {
 }
 
 impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for StickyMacro<M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         for (event, status) in iter_unhandled_mut(events) {
             //a sticky key
             // on press if not active -> active
@@ -93,6 +94,7 @@ impl<T: USBKeyOut, M: OnOff> ProcessKeys<T> for StickyMacro<M> {
                 Event::TimeOut(_) => {}
             }
         }
+    HandlerResult::NoOp
     }
 }
 #[cfg(test)]

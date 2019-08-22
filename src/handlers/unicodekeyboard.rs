@@ -1,4 +1,4 @@
-use crate::handlers::ProcessKeys;
+use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use no_std_compat::prelude::v1::*;
@@ -34,7 +34,7 @@ impl UnicodeKeyboard {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
                 Event::KeyPress(kc) => {
@@ -56,6 +56,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for UnicodeKeyboard {
                 Event::TimeOut(_) => {}
             }
         }
+        HandlerResult::NoOp
     }
 }
 #[cfg(test)]

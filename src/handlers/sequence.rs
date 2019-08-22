@@ -1,4 +1,4 @@
-use crate::handlers::{Action, ProcessKeys};
+use crate::handlers::{Action, ProcessKeys, HandlerResult};
 use crate::key_codes::{KeyCode, KeyCodeInfo};
 use crate::{iter_unhandled_mut, Event, EventStatus, USBKeyOut};
 use no_std_compat::prelude::v1::*;
@@ -44,7 +44,7 @@ impl<'a, M: Action> Sequence<'a, M> {
 }
 
 impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         let mut codes_to_delete: Vec<u32> = Vec::new();
         // we need to scan for handled key releases if we don't see any unhandled ones -
         // they might have triggered a different sequence, which set them to Handled
@@ -100,6 +100,7 @@ impl<T: USBKeyOut, M: Action> ProcessKeys<T> for Sequence<'_, M> {
                 }
             }
         }
+    HandlerResult::NoOp
     }
 }
 #[cfg(test)]

@@ -1,9 +1,9 @@
-use crate::handlers::OnOff;
+use crate::handlers::{OnOff, ProcessKeys, HandlerResult};
 #[allow(unused_imports)]
 use crate::key_codes::{AcceptsKeycode, KeyCode};
 #[allow(unused_imports)]
 use crate::Keyboard;
-use crate::{iter_unhandled_mut, Event, EventStatus, KeyboardState, ProcessKeys, USBKeyOut};
+use crate::{iter_unhandled_mut, Event, EventStatus, KeyboardState, USBKeyOut};
 use alloc::sync::Arc;
 use no_std_compat::prelude::v1::*;
 use spin::RwLock;
@@ -95,7 +95,7 @@ impl TimeoutLogger {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for TimeoutLogger {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         for (event, _status) in iter_unhandled_mut(events) {
             if let Event::TimeOut(ms_since_last) = event {
                 if *ms_since_last > self.min_timeout_ms {
@@ -103,6 +103,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for TimeoutLogger {
                 }
             }
         }
+        HandlerResult::NoOp
     }
 }
 #[derive(Debug)]
@@ -142,8 +143,9 @@ impl Debugger {
 }
 #[cfg(test)]
 impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> () {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> HandlerResult {
         println!("{}, {:?}", self.s, events);
+        HandlerResult::NoOp
     }
 }
 

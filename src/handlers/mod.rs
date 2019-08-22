@@ -17,7 +17,7 @@ mod usbkeyboard;
 
 use crate::USBKeyOut;
 pub use autoshift::AutoShift;
-pub use layer::{Layer, LayerAction};
+pub use layer::{Layer, LayerAction, AutoOff};
 pub use rewrite_layer::RewriteLayer;
 //pub use leader::Leader;
 pub use longtap::LongTap;
@@ -33,13 +33,19 @@ pub use usbkeyboard::USBKeyboard;
 /// they process the events, set their status to either Handled or Ignored
 /// (if more data is necessary), and send input to the computer via output
 pub trait ProcessKeys<T: USBKeyOut> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T);
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult;
     /// whether this handler is enabled after add_handlers
     /// (true for most, false for Layers)
     fn default_enabled(&self) -> bool {
         true
     }
 }
+
+pub enum HandlerResult {
+    NoOp,
+    Disable 
+}
+
 
 /// A callback used when one single action is needed
 ///

@@ -1,9 +1,9 @@
 use crate::handlers::RewriteLayer;
 /// premade handlers for various occacions
-use crate::handlers::{Action, OnOff, OneShot, PressReleaseMacro, SpaceCadet};
+use crate::handlers::{Action, OnOff, OneShot, PressReleaseMacro, SpaceCadet, HandlerResult, ProcessKeys};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
-use crate::{AcceptsKeycode, HandlerID, KeyCode, ProcessKeys, USBKeyOut};
+use crate::{AcceptsKeycode, HandlerID, KeyCode, USBKeyOut};
 use no_std_compat::prelude::v1::*;
 ///toggle a handler on activate
 /// do noting on deactivate
@@ -209,7 +209,7 @@ pub fn space_cadet_handler(
 /// 0
 pub struct CopyPaste {}
 impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         //step 0: on key release, remove all prior key presses.
         for (e, status) in iter_unhandled_mut(events) {
             match e {
@@ -244,6 +244,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
                 _ => {}
             }
         }
+        HandlerResult::NoOp
     }
 }
 

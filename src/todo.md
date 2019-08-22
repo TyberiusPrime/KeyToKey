@@ -39,3 +39,4 @@ Done
  * dvorak - replace with const something to safe on RAM
  * layer SendStringShifted test
  * oneshot + double tap key (ie. a one shot until you double tap it..)
+ * Layers support AutoOff (similar to a OneShot, but without a OneShot trigger)

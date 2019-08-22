@@ -1,8 +1,9 @@
-use crate::handlers::ProcessKeys;
-use crate::key_codes::AcceptsKeycode;
+use crate::handlers::{ProcessKeys, HandlerResult};
+use crate::key_codes::{AcceptsKeycode, KeyCode};
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::Modifier::*;
 use crate::USBKeyOut;
+use crate::handlers::oneshot::ONESHOT_TRIGGERS;
 
 use no_std_compat::prelude::v1::*;
 pub enum LayerAction<'a> {
@@ -12,6 +13,14 @@ pub enum LayerAction<'a> {
     SendString(&'a str),
     SendStringShifted(&'a str, &'a str),
     //    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
+}
+
+#[repr(u8)]
+pub enum AutoOff {
+    No,
+    AfterMatch, 
+    AfterNonModifier,
+    AfterAll
 }
 
 /// A layer either rewrites a key to another one
@@ -29,27 +38,34 @@ pub enum LayerAction<'a> {
 /// Consider using a RewriteLayer instead if you don't need
 /// the string or Shift functionality.
 ///
-///
-///
+/// If AutoOff is set to anything but AutoOff::No, the layer will turn itself of
+/// after any key release (AutoOff::AfterAll), after a non-modifier-non-oneshot
+/// key release (AutoOff::AfterNonModifier), or after a successfull 
+/// match AutoOff::AfterMatch
 pub struct Layer<'a> {
     rewrites: Vec<(u32, LayerAction<'a>)>,
+    auto_off: AutoOff
 }
 impl Layer<'_> {
-    pub fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>) -> Layer<'_> {
+    pub fn new<F: AcceptsKeycode>(rewrites: Vec<(F, LayerAction)>, 
+    auto_off: AutoOff) -> Layer<'_> {
         Layer {
             rewrites: rewrites
                 .into_iter()
                 .map(|(trigger, action)| (trigger.to_u32(), action))
                 .collect(),
+            auto_off
         }
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
+        let mut result = HandlerResult::NoOp;
         for (event, status) in iter_unhandled_mut(events) {
             //events.iter_mut() {
             match event {
                 Event::KeyRelease(kc) => {
+                    let mut rewrite_happend = false;
                     for (from, to) in self.rewrites.iter() {
                         if *from == kc.keycode {
                             match to {
@@ -57,6 +73,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     if (kc.flag & 2) == 0 {
                                         kc.keycode = *to_keycode;
                                         kc.flag |= 2;
+                                        rewrite_happend = true;
                                     }
                                     break; //only one rewrite per layer
                                 }
@@ -68,12 +85,14 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                             kc.keycode = *to_keycode;
                                         }
                                         kc.flag |= 2;
+                                        rewrite_happend = true;
                                     }
                                     break; //only one rewrite per layer
                                 }
                                 LayerAction::SendString(s) => {
                                     output.send_string(s);
                                     *status = EventStatus::Handled;
+                                    rewrite_happend = true;
                                     break; //only one rewrite per layer
                                 }
                                 LayerAction::SendStringShifted(s1, s2) => {
@@ -83,11 +102,26 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                         output.send_string(s1);
                                     }
                                     *status = EventStatus::Handled;
+                                    rewrite_happend = true;
                                     break; //only one rewrite per layer
                                 }
                             }
                         }
                     }
+                    let turn_off = match self.auto_off {
+                        AutoOff::No => false,
+                        AutoOff::AfterAll => true,
+                        AutoOff::AfterMatch => rewrite_happend,
+                        AutoOff::AfterNonModifier => {
+                            !ONESHOT_TRIGGERS.read().contains(&kc.keycode) && ! 
+                            ( KeyCode::LCtrl.to_u32() <= kc.keycode && kc.keycode <= KeyCode::RGui.to_u32())
+                        }
+                    };
+                    if turn_off {
+                        result = HandlerResult::Disable;
+                    }
+
+
                 }
                 Event::KeyPress(kc) => {
                     for (from, to) in self.rewrites.iter() {
@@ -123,6 +157,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                 Event::TimeOut(_) => {}
             }
         }
+        result
     }
     fn default_enabled(&self) -> bool {
         false
@@ -132,7 +167,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{Layer, LayerAction, USBKeyboard, UnicodeKeyboard};
+    use crate::handlers::{Layer, LayerAction, USBKeyboard, UnicodeKeyboard, AutoOff};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
@@ -148,8 +183,9 @@ mod tests {
     fn test_layer_rewrite() {
         let l = Layer::new(vec![(
             KeyCode::A,
-            LayerAction::RewriteTo(KeyCode::X.into()),
-        )]);
+            LayerAction::RewriteTo(KeyCode::X.into()),)],
+            AutoOff::No,
+        );
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -207,8 +243,9 @@ mod tests {
     fn test_layer_rewrite_shifted() {
         let l = Layer::new(vec![(
             KeyCode::A,
-            LayerAction::RewriteToShifted(KeyCode::M.into(), KeyCode::Z.into()),
-        )]);
+            LayerAction::RewriteToShifted(KeyCode::M.into(), KeyCode::Z.into()))],
+            AutoOff::No,
+        );
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         let layer_id = keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
@@ -248,7 +285,9 @@ mod tests {
         let l = Layer::new(vec![
             (KeyCode::A, RewriteTo(KeyCode::B.to_u32())),
             (KeyCode::B, RewriteTo(KeyCode::C.to_u32())),
-        ]);
+        ],
+        AutoOff::No,
+        );
         let layer_id = keyboard.add_handler(Box::new(l));
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
@@ -261,7 +300,8 @@ mod tests {
     fn test_layer_disable_in_the_middle() {
         use crate::handlers::LayerAction::RewriteTo;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let l = Layer::new(vec![(KeyCode::A, RewriteTo(KeyCode::B.to_u32()))]);
+        let l = Layer::new(vec![(KeyCode::A, RewriteTo(KeyCode::B.to_u32()))],
+        AutoOff::No);
         let layer_id = keyboard.add_handler(Box::new(l));
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
@@ -283,7 +323,7 @@ mod tests {
     fn test_rewrite_shifted() {
         use crate::handlers::LayerAction::RewriteToShifted;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let l = Layer::new(vec![(KeyCode::A, RewriteToShifted(0xC6, 0xF6))]);
+        let l = Layer::new(vec![(KeyCode::A, RewriteToShifted(0xC6, 0xF6))], AutoOff::No);
         let layer_id = keyboard.add_handler(Box::new(l));
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
@@ -316,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_layer_rewrite_unicode() {
-        let l = Layer::new(vec![(KeyCode::A, LayerAction::RewriteTo(0xDF))]);
+        let l = Layer::new(vec![(KeyCode::A, LayerAction::RewriteTo(0xDF))], AutoOff::No);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(crate::test_helpers::Debugger::new("start")));
         keyboard.output.state().unicode_mode = UnicodeSendMode::Debug;
@@ -342,7 +382,7 @@ mod tests {
     fn test_rewrite_shifted_string() {
         use crate::handlers::LayerAction::SendStringShifted;
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
-        let l = Layer::new(vec![(KeyCode::A, SendStringShifted("a", "A"))]);
+        let l = Layer::new(vec![(KeyCode::A, SendStringShifted("a", "A"))], AutoOff::No);
         let layer_id = keyboard.add_handler(Box::new(l));
         assert!(!keyboard.output.state().is_handler_enabled(layer_id));
         keyboard.output.state().enable_handler(layer_id);
@@ -372,6 +412,185 @@ mod tests {
         );
         keyboard.output.clear();
     }
+
+   #[test]
+    fn test_layer_auto_off_after_all() {
+        use crate::test_helpers::Checks;
+        use crate::key_codes::KeyCode::*;
+        let l = Layer::new(vec![(
+            A,
+            LayerAction::RewriteTo(X.into()),)],
+            AutoOff::AfterAll,
+        );
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let layer_id = keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(B, &[&[B]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(B, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(A, &[&[X]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(A, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(LShift, &[&[LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(LShift, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+    }
+
+    #[test]
+    fn test_layer_auto_off_after_match() {
+        use crate::test_helpers::Checks;
+        use crate::key_codes::KeyCode::*;
+        let l = Layer::new(vec![(
+            A,
+            LayerAction::RewriteTo(X.into()),)],
+            AutoOff::AfterMatch,
+        );
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let layer_id = keyboard.add_handler(Box::new(l));
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(B, &[&[B]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(B, &[&[]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(A, &[&[X]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(A, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(LShift, &[&[LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(LShift, &[&[]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.pc(LShift, &[&[LShift]]);
+        keyboard.pc(A, &[&[LShift, X]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(A, &[&[LShift]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.rc(LShift, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+    }
+
+    #[test]
+    fn test_layer_auto_off_after_non_modifier() {
+        use crate::test_helpers::Checks;
+        use crate::key_codes::KeyCode::*;
+        use crate::key_codes::UserKey;
+        use crate::premade::one_shot_handler;
+        let l = Layer::new(vec![(
+            A,
+            LayerAction::RewriteTo(X.into()),)],
+            AutoOff::AfterNonModifier,
+        );
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let layer_id = keyboard.add_handler(Box::new(l));
+
+        let l2 = Layer::new(vec![(
+            C,
+            LayerAction::RewriteTo(Y.into()),)],
+            AutoOff::No,
+        );
+        let layer_id2 = keyboard.add_handler(Box::new(l2));
+        let oneshot = one_shot_handler(UserKey::UK0, layer_id2, 0, 0);
+
+        keyboard.add_handler(oneshot);
+        keyboard.add_handler(Box::new(USBKeyboard::new()));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(B, &[&[B]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(B, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.pc(A, &[&[X]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(A, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.pc(LShift, &[&[LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(LShift, &[&[]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.pc(LShift, &[&[LShift]]);
+        keyboard.pc(A, &[&[LShift, X]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        keyboard.rc(A, &[&[LShift]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.rc(LShift, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.pc(UserKey::UK0, &[&[]]);
+        keyboard.rc(UserKey::UK0, &[&[]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.pc(C, &[&[Y]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.rc(C, &[&[]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id2));
+
+
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.pc(UserKey::UK0, &[&[]]);
+        keyboard.rc(UserKey::UK0, &[&[]]);
+        keyboard.pc(LShift, &[&[LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.pc(D, &[&[D, LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        //disabled by the one shot
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.rc(D, &[&[LShift]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.rc(LShift, &[&[]]);
+
+        keyboard.output.state().enable_handler(layer_id);
+        keyboard.pc(UserKey::UK0, &[&[]]);
+        keyboard.rc(UserKey::UK0, &[&[]]);
+        keyboard.pc(LShift, &[&[LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.pc(A, &[&[X, LShift]]);
+        assert!(keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id2));
+        keyboard.rc(A, &[&[LShift]]);
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id));
+        assert!(!keyboard.output.state().is_handler_enabled(layer_id2));
+
+
+
+
+    }
+
 
 
 }
