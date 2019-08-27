@@ -31,6 +31,9 @@ pub enum Modifier {
     Alt = 2,
     Gui = 3,
 }
+ 
+const KEYBOARD_STATE_RESERVED_BITS: usize = 5;
+const ABORT_BIT: usize = 4;
 
 #[derive(Debug, Default)]
 pub struct KeyboardState {
@@ -41,7 +44,7 @@ impl KeyboardState {
     pub fn new() -> KeyboardState {
         KeyboardState {
             unicode_mode: UnicodeSendMode::Linux,
-            modifiers_and_enabled_handlers: sbvec![false; 4],
+            modifiers_and_enabled_handlers: sbvec![false; KEYBOARD_STATE_RESERVED_BITS],
         }
     }
 
@@ -62,6 +65,11 @@ impl KeyboardState {
         self.modifiers_and_enabled_handlers.set(no, false);
     }
 
+    pub fn set_handler(&mut self, no: HandlerID, enabled: bool) {
+        self.modifiers_and_enabled_handlers.set(no, enabled);
+    }
+
+
     pub fn toggle_handler(&mut self, no: HandlerID) {
         self.modifiers_and_enabled_handlers
             .set(no, !self.modifiers_and_enabled_handlers[no]);
@@ -69,6 +77,22 @@ impl KeyboardState {
 
     pub fn is_handler_enabled(&self, no: HandlerID) -> bool {
         self.modifiers_and_enabled_handlers[no]
+    }
+
+    ///tell the Keyboard to 
+    /// * reset handlers to their default state, clear 
+    /// * clear all remaining events - unhandled or not
+    /// * reset all modifiers to default
+    pub fn abort_and_clear_events(&mut self) {
+        self.modifiers_and_enabled_handlers.set(ABORT_BIT, true); // signal the handle_events loop to abort
+    }
+
+    fn _clear_abort(&mut self) {
+        self.modifiers_and_enabled_handlers.set(ABORT_BIT, false);
+    }
+
+    fn _aborted(&self) -> bool {
+        return self.modifiers_and_enabled_handlers[ABORT_BIT];
     }
 }
 ///an identifer for an added handler
@@ -127,12 +151,17 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         }
         //skip the modifiers
         for (ii, h) in self.handlers.iter_mut().enumerate() {
-            if self.output.state().modifiers_and_enabled_handlers[ii + 4] {
+            if self.output.state().modifiers_and_enabled_handlers[ii + KEYBOARD_STATE_RESERVED_BITS] {
                 match h.process_keys(&mut self.events, &mut self.output) {
                     HandlerResult::NoOp => {},
                     HandlerResult::Disable => {
-                        self.output.state().disable_handler((ii + 4) as HandlerID);
+                        self.output.state().disable_handler((ii + KEYBOARD_STATE_RESERVED_BITS) as HandlerID);
                     }
+                }
+                if self.output.state()._aborted() {
+                    self.output.state()._clear_abort();
+                    self.events.clear();
+                    break; // no more handlers being done
                 }
             }
         }

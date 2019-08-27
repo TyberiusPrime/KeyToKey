@@ -249,11 +249,48 @@ impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
 }
 
 
+/// Abort all event handling, throw away remaining events,
+/// unset all modifiers and enable/disable handers as requested
+/// by handler_overwrite
 pub struct ActionNone;
 impl Action for ActionNone{
     fn on_trigger(&mut self, _output: &mut impl USBKeyOut) {}
 }
 
+pub struct ActionAbort {
+    handler_overwrite: Vec<(HandlerID, bool)>
+}
+
+impl ActionAbort {
+    pub fn new() -> ActionAbort {
+        ActionAbort{handler_overwrite: Vec::new()}
+    }
+
+    fn do_abort(&mut self, output: &mut impl USBKeyOut) {
+        let state = output.state();
+        for (handler_id, enabled) in self.handler_overwrite.iter() {
+            state.set_handler(*handler_id, *enabled);
+        }
+        state.set_modifier(Shift, false);
+        state.set_modifier(Ctrl, false);
+        state.set_modifier(Alt, false);
+        state.set_modifier(Gui, false);
+        state.abort_and_clear_events();
+    }
+
+}
+
+impl Action for ActionAbort {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {self.do_abort(output);}
+    }
+
+impl OnOff for ActionAbort {
+    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+        self.do_abort(output);
+    }
+    fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {}
+
+}
 
 
 #[cfg(test)]
@@ -289,6 +326,7 @@ mod tests {
         keyboard.handle_keys().unwrap();
         assert!(keyboard.output.state().is_handler_enabled(id));
     }
+
     #[test]
     fn test_layer_double_rewrite_dvorak() {
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
@@ -511,4 +549,44 @@ mod tests {
         assert!(!keyboard.output.state().modifier(Shift));
         check_output(&keyboard, &[&[]]); //note that the one shots always output the L variants
     }
+
+    #[test]
+    fn test_abort() {
+        use crate::premade;
+        use crate::handlers::{RewriteLayer, PressReleaseMacro};
+        use crate::UserKey;
+        use crate::test_helpers::{Checks, check_output};
+        use crate::Modifier::Shift;
+        let mut keyboard = Keyboard::new(KeyOutCatcher::new());
+        let mut aa = premade::ActionAbort::new();
+        let should_enable = keyboard.add_handler(premade::one_shot_alt(0,0));
+        const MAP: &[(u32, u32)] = &[(KeyCode::A.to_u32(), KeyCode::X.to_u32())];
+        let should_disable = keyboard.add_handler(Box::new(RewriteLayer::new(&MAP)));
+        keyboard.output.state().enable_handler(should_disable);
+        keyboard.output.state().disable_handler(should_enable);
+
+        aa.handler_overwrite.push((should_enable, true));
+        aa.handler_overwrite.push((should_disable, false));
+
+        keyboard.add_handler(
+            Box::new(PressReleaseMacro::new(UserKey::UK0, aa))
+        );
+        keyboard.add_handler(Box::new(crate::handlers::USBKeyboard {}));
+
+        assert!(!keyboard.output.state().is_handler_enabled(should_enable));
+        assert!(keyboard.output.state().is_handler_enabled(should_disable));
+
+        keyboard.pc(KeyCode::LShift, &[&[KeyCode::LShift]]);
+        assert!(keyboard.output.state().modifier(Shift));
+        keyboard.add_keypress(UserKey::UK0, 50);
+        keyboard.add_keypress(KeyCode::A, 50);
+        keyboard.handle_keys().unwrap();
+        check_output(&keyboard, &[]);
+ 
+        assert!(keyboard.output.state().is_handler_enabled(should_enable));
+        assert!(!keyboard.output.state().is_handler_enabled(should_disable));
+
+        assert!(keyboard.events.is_empty());
+    }
+
 }

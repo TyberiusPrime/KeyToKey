@@ -140,6 +140,7 @@ mod tests {
         check_output(&keyboard, &[&[KeyCode::I], &[]]);
         keyboard.output.clear();
     }
+
     #[test]
     fn test_sticky_macro() {
         let counter = Arc::new(RwLock::new(PressCounter {
