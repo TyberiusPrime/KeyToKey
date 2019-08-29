@@ -11,7 +11,7 @@ pub enum TapDanceEnd {
 
 /// call backs for completed tap dances
 pub trait TapDanceAction {
-    fn on_tapdance( &mut self, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd);
+    fn on_tapdance( &mut self, trigger: u32, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd);
 }
 
 
@@ -45,7 +45,7 @@ impl<T: USBKeyOut, M: TapDanceAction> ProcessKeys<T> for TapDance<M> {
                 Event::KeyPress(kc) => {
                     if kc.keycode != self.trigger {
                         if self.tap_count > 0 {
-                            self.action.on_tapdance(output, self.tap_count, TapDanceEnd::OtherKey);
+                            self.action.on_tapdance(self.trigger, output, self.tap_count, TapDanceEnd::OtherKey);
                             self.tap_count = 0;
                         }
                     } else {
@@ -55,7 +55,7 @@ impl<T: USBKeyOut, M: TapDanceAction> ProcessKeys<T> for TapDance<M> {
                 }
                 Event::TimeOut(ms_since_last) => {
                     if self.tap_count > 0 && *ms_since_last >= self.timeout_ms {
-                            self.action.on_tapdance(output, self.tap_count, TapDanceEnd::Timeout);
+                            self.action.on_tapdance(self.trigger, output, self.tap_count, TapDanceEnd::Timeout);
                         self.tap_count = 0;
                     }
                 }
@@ -93,7 +93,7 @@ mod tests {
         }
     }
     impl TapDanceAction for Arc<RwLock<TapDanceLogger>> {
-        fn on_tapdance( &mut self, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd){
+        fn on_tapdance( &mut self, _trigger: u32, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd){
             match tap_end {
                 TapDanceEnd::OtherKey => self.write().other_key_taps += tap_count as u16,
                 TapDanceEnd::Timeout => self.write().timeout_taps += tap_count as u16,
