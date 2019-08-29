@@ -3,26 +3,37 @@ use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use no_std_compat::prelude::v1::*;
-pub struct TapDance<'a, T, F> {
+
+pub enum TapDanceEnd {
+    Timeout,
+    OtherKey
+}
+
+/// call backs for completed tap dances
+pub trait TapDanceAction {
+    fn on_tapdance( &mut self, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd);
+}
+
+
+pub struct TapDance<M>{
     trigger: u32,
     tap_count: u8,
-    on_tap_complete: F, //todo: should we differentiate between timeout and other key by passing an enum?
+    action: M,
     //todo: add on_each_tap...
     timeout_ms: u16,
-    phantom: core::marker::PhantomData<&'a T>,
 }
-impl<'a, T: USBKeyOut, F: FnMut(u8, &mut T)> TapDance<'a, T, F> {
-    pub fn new(trigger: impl AcceptsKeycode, on_tap_complete: F) -> TapDance<'a, T, F> {
+
+impl <M: TapDanceAction> TapDance<M> {
+    pub fn new(trigger: impl AcceptsKeycode, action: M, timeout_ms: u16) -> TapDance<M> {
         TapDance {
             trigger: trigger.to_u32(),
             tap_count: 0,
-            on_tap_complete,
-            timeout_ms: 250,
-            phantom: core::marker::PhantomData,
+            action,
+            timeout_ms: timeout_ms,
         }
     }
 }
-impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
+impl<T: USBKeyOut, M: TapDanceAction> ProcessKeys<T> for TapDance<M> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) ->HandlerResult {
         for (event, status) in iter_unhandled_mut(events) {
             match event {
@@ -34,7 +45,7 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
                 Event::KeyPress(kc) => {
                     if kc.keycode != self.trigger {
                         if self.tap_count > 0 {
-                            (self.on_tap_complete)(self.tap_count, output);
+                            self.action.on_tapdance(output, self.tap_count, TapDanceEnd::OtherKey);
                             self.tap_count = 0;
                         }
                     } else {
@@ -43,8 +54,8 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
                     }
                 }
                 Event::TimeOut(ms_since_last) => {
-                    if self.tap_count > 0 && *ms_since_last > self.timeout_ms {
-                        (self.on_tap_complete)(self.tap_count, output);
+                    if self.tap_count > 0 && *ms_since_last >= self.timeout_ms {
+                            self.action.on_tapdance(output, self.tap_count, TapDanceEnd::Timeout);
                         self.tap_count = 0;
                     }
                 }
@@ -57,105 +68,95 @@ impl<T: USBKeyOut, F: FnMut(u8, &mut T)> ProcessKeys<T> for TapDance<'_, T, F> {
 //#[macro_use]
 //extern crate std;
 mod tests {
-    use crate::handlers::{TapDance, USBKeyboard};
+    use crate::handlers::{TapDance, USBKeyboard, TapDanceAction, TapDanceEnd};
     #[allow(unused_imports)]
     use crate::key_codes::KeyCode;
     #[allow(unused_imports)]
-    use crate::test_helpers::{check_output, KeyOutCatcher};
+    use crate::test_helpers::{check_output, KeyOutCatcher, Checks};
     #[allow(unused_imports)]
     use crate::{
         Event, EventStatus, Keyboard, KeyboardState, ProcessKeys, USBKeyOut, UnicodeSendMode,
     };
     #[allow(unused_imports)]
     use no_std_compat::prelude::v1::*;
+    use alloc::sync::Arc;
+    use spin::RwLock;
+
+    #[derive(Debug)]
+    pub struct TapDanceLogger {
+        pub other_key_taps: u16,
+        pub timeout_taps: u16,
+    }
+    impl TapDanceLogger {
+        fn new() -> TapDanceLogger {
+            TapDanceLogger{other_key_taps: 0, timeout_taps: 0}
+        }
+    }
+    impl TapDanceAction for Arc<RwLock<TapDanceLogger>> {
+        fn on_tapdance( &mut self, output: &mut impl USBKeyOut, tap_count: u8, tap_end: TapDanceEnd){
+            match tap_end {
+                TapDanceEnd::OtherKey => self.write().other_key_taps += tap_count as u16,
+                TapDanceEnd::Timeout => self.write().timeout_taps += tap_count as u16,
+            }
+            output.send_keys(&[KeyCode::A]);
+        }
+    }
+
     #[test]
     fn test_tapdance() {
-        let l = TapDance::new(
-            KeyCode::X,
-            |tap_count, output: &mut KeyOutCatcher| match tap_count {
-                1 => output.send_keys(&[KeyCode::A]),
-                2 => output.send_keys(&[KeyCode::B]),
-                3 => output.send_keys(&[KeyCode::C]),
-                _ => output.send_keys(&[KeyCode::D]),
-            },
-        );
-        let timeout = l.timeout_ms;
+        let record = Arc::new(RwLock::new(TapDanceLogger::new()));
+        let l = TapDance::new( KeyCode::X, record.clone(), 250);
         let mut keyboard = Keyboard::new(KeyOutCatcher::new());
         keyboard.add_handler(Box::new(l));
         keyboard.add_handler(Box::new(USBKeyboard::new()));
         //simplest case, one press/release then another key
-        keyboard.add_keypress(KeyCode::X, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 10);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::Z, 20);
-        keyboard.handle_keys().unwrap();
-        //       keyboard.add_keyrelease(KeyCode::Z, 30);
-        check_output(&keyboard, &[&[KeyCode::A], &[KeyCode::Z]]);
-        keyboard.add_keyrelease(KeyCode::Z, 20);
-        keyboard.handle_keys().unwrap();
-        assert!(keyboard.events.is_empty());
+        keyboard.pc(KeyCode::X, &[&[]]);
+        assert!(record.read().other_key_taps == 0);
+        assert!(record.read().timeout_taps == 0);
+
+        keyboard.rc(KeyCode::X, &[&[]]);
+        assert!(record.read().other_key_taps == 0);
+        assert!(record.read().timeout_taps == 0);
+
+        keyboard.pc(KeyCode::Z, &[&[KeyCode::A], &[KeyCode::Z]]);
+        assert!(record.read().other_key_taps == 1);
+        assert!(record.read().timeout_taps == 0);
+
+        keyboard.rc(KeyCode::Z, &[&[]]);
+        assert!(record.read().other_key_taps == 1);
+        assert!(record.read().timeout_taps == 0);
+
         //two taps, then another key
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 10);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 20);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 30);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::Z, 40);
-        keyboard.handle_keys().unwrap();
-        //        keyboard.add_keyrelease(KeyCode::Z, 50);
-        check_output(&keyboard, &[&[KeyCode::B], &[KeyCode::Z]]);
-        keyboard.add_keyrelease(KeyCode::Z, 20);
-        keyboard.handle_keys().unwrap();
-        assert!(keyboard.events.is_empty());
+        keyboard.pc(KeyCode::X, &[&[]]);
+        keyboard.rc(KeyCode::X, &[&[]]);
+        keyboard.pc(KeyCode::X, &[&[]]);
+        keyboard.rc(KeyCode::X, &[&[]]);
+        assert!(record.read().other_key_taps == 1);
+       assert!(record.read().timeout_taps == 0);
+
+        keyboard.pc(KeyCode::Z, &[&[KeyCode::A], &[KeyCode::Z]]);
+        assert!(record.read().other_key_taps == 3);
+        assert!(record.read().timeout_taps == 0);
+
+        keyboard.rc(KeyCode::Z, &[&[]]);
+        assert!(record.read().other_key_taps == 3);
+        assert!(record.read().timeout_taps == 0);
+
+
+
         //three taps, then a time out
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 0);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 10);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 20);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 30);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keypress(KeyCode::X, 20);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_keyrelease(KeyCode::X, 30);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_timeout(timeout - 1);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[]]);
-        keyboard.output.clear();
-        keyboard.add_timeout(timeout + 1);
-        keyboard.handle_keys().unwrap();
-        check_output(&keyboard, &[&[KeyCode::C], &[]]);
+        keyboard.pc(KeyCode::X, &[&[]]);
+        keyboard.rc(KeyCode::X, &[&[]]);
+        keyboard.pc(KeyCode::X, &[&[]]);
+        keyboard.rc(KeyCode::X, &[&[]]);
+        keyboard.pc(KeyCode::X, &[&[]]);
+        keyboard.rc(KeyCode::X, &[&[]]);
+        assert!(record.read().other_key_taps == 3);
+        assert!(record.read().timeout_taps == 0);
+        //not a timeout...
+        keyboard.tc(249, &[&[]]); //remember, repeaeted empty ones are (supossed to be) ommited by the downstream USB handling
+        keyboard.tc(250, &[&[KeyCode::A], &[]]);
+        assert!(record.read().other_key_taps == 3);
+        assert!(record.read().timeout_taps == 3);
     }
 }

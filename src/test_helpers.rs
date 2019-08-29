@@ -155,6 +155,13 @@ pub trait Checks {
     fn pc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]);
     /// release and check
     fn rc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]);
+    /// timeout and check
+    fn tc(&mut self, ms_since_last: u16, should: &[&[KeyCode]]);
+    /// 
+    /// press check with defined ms_since
+    fn pct(&mut self, key: impl AcceptsKeycode, ms_since_last: u16, should: &[&[KeyCode]]);
+    /// release check with defined ms_since
+    fn rct(&mut self, key: impl AcceptsKeycode, ms_since_last: u16, should: &[&[KeyCode]]);
 }
 
 #[cfg(test)]
@@ -167,6 +174,24 @@ impl Checks for Keyboard<'_, KeyOutCatcher> {
     }
     fn rc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]) {
         self.add_keyrelease(key, 50);
+        self.handle_keys().unwrap();
+        check_output(self, should);
+        self.output.clear();
+    }
+    fn tc(&mut self, ms_since_last: u16, should: &[&[KeyCode]]) {
+        self.add_timeout(ms_since_last);
+        self.handle_keys().unwrap();
+        check_output(self, should);
+        self.output.clear();
+    }
+    fn pct(&mut self, key: impl AcceptsKeycode, ms_since_last: u16, should: &[&[KeyCode]]) {
+        self.add_keypress(key, ms_since_last);
+        self.handle_keys().unwrap();
+        check_output(self, should);
+        self.output.clear();
+    }
+    fn rct(&mut self, key: impl AcceptsKeycode, ms_since_last: u16, should: &[&[KeyCode]]) {
+        self.add_keyrelease(key, ms_since_last);
         self.handle_keys().unwrap();
         check_output(self, should);
         self.output.clear();

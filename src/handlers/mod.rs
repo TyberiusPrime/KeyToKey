@@ -25,7 +25,7 @@ pub use macros::{PressReleaseMacro, StickyMacro};
 pub use oneshot::OneShot;
 pub use sequence::Sequence;
 pub use spacecadet::SpaceCadet;
-pub use tapdance::TapDance;
+pub use tapdance::{TapDance, TapDanceAction, TapDanceEnd};
 pub use unicodekeyboard::UnicodeKeyboard;
 pub use usbkeyboard::USBKeyboard;
 /// Handlers are defined by this trait

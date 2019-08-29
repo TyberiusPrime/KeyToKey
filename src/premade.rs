@@ -266,6 +266,10 @@ impl ActionAbort {
         ActionAbort{handler_overwrite: Vec::new()}
     }
 
+    pub fn set_abort_status(&mut self, handler_id: HandlerID, enabled: bool) {
+        self.handler_overwrite.push((handler_id, enabled));
+    }
+
     fn do_abort(&mut self, output: &mut impl USBKeyOut) {
         let state = output.state();
         for (handler_id, enabled) in self.handler_overwrite.iter() {
@@ -565,8 +569,8 @@ mod tests {
         keyboard.output.state().enable_handler(should_disable);
         keyboard.output.state().disable_handler(should_enable);
 
-        aa.handler_overwrite.push((should_enable, true));
-        aa.handler_overwrite.push((should_disable, false));
+        aa.set_abort_status(should_enable, true);
+        aa.set_abort_status(should_disable, false);
 
         keyboard.add_handler(
             Box::new(PressReleaseMacro::new(UserKey::UK0, aa))
