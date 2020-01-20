@@ -1,10 +1,53 @@
-use crate::handlers::OnOff;
+use crate::handlers::{Action, OnOff};
 use crate::handlers::{ProcessKeys, HandlerResult};
 use crate::key_codes::AcceptsKeycode;
 use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use no_std_compat::prelude::v1::*;
-//// The simples callback -
+
+/// The simplest callback -
+/// call on_trigger on press, nothing on release
+/// trigger may be any keycode,
+/// but consider using the constants in UserKey::*
+/// which is not used by either UnicodeKeyboard or UsbKeyboard
+pub struct PressMacro<M> {
+    keycode: u32,
+    callback: M,
+}
+impl<M: Action> PressMacro<M> {
+    pub fn new(trigger: impl AcceptsKeycode, callback: M) -> PressMacro<M> {
+        PressMacro {
+            keycode: trigger.to_u32(),
+            callback,
+        }
+    }
+}
+impl<T: USBKeyOut, M: Action> ProcessKeys<T> for PressMacro<M> {
+    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
+        for (event, status) in iter_unhandled_mut(events) {
+            match event {
+                Event::KeyPress(kc) => {
+                    if kc.keycode == self.keycode {
+                        *status = EventStatus::Handled;
+                        self.callback.on_trigger(output);
+                    }
+                }
+                Event::KeyRelease(kc) => {
+                    if kc.keycode == self.keycode {
+                        *status = EventStatus::Handled;
+                    }
+                }
+                Event::TimeOut(_) => {}
+            }
+        }
+    HandlerResult::NoOp
+    }
+}
+
+
+
+
+/// A simple callback -
 /// call on_press(output: impl USBKeyOut) on key press
 /// and on_release(output) on release))
 /// trigger may be any keycode,

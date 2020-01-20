@@ -21,7 +21,7 @@ pub use layer::{Layer, LayerAction, AutoOff};
 pub use rewrite_layer::RewriteLayer;
 //pub use leader::Leader;
 pub use longtap::LongTap;
-pub use macros::{PressReleaseMacro, StickyMacro};
+pub use macros::{PressMacro, PressReleaseMacro, StickyMacro};
 pub use oneshot::OneShot;
 pub use sequence::Sequence;
 pub use spacecadet::SpaceCadet;
@@ -74,6 +74,15 @@ impl Action for KeyCode {
     }
 }
 
+///Register multiple key codes as OnOff action
+impl Action for Vec<KeyCode> {
+    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+        output.send_keys(self);
+        output.send_empty();
+    }
+}
+
+
 /// A trait for callbacks when an on/off action is needed
 ///
 ///
@@ -83,6 +92,9 @@ pub trait OnOff {
     fn on_activate(&mut self, output: &mut impl USBKeyOut);
     fn on_deactivate(&mut self, output: &mut impl USBKeyOut);
 }
+
+
+
 /// an Action
 ///
 /// For example by a leader sequence or a tap dance.
