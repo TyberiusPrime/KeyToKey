@@ -385,7 +385,7 @@ mod tests {
             keycode: KeyCode
         }
         impl Action for MyAction { 
-            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+            fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
                 output.send_keys(&[self.keycode]);
             }
         }

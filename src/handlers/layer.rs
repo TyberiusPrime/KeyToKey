@@ -13,6 +13,7 @@ pub enum LayerAction<'a> {
     SendString(&'a str),
     SendStringShifted(&'a str, &'a str),
     //    Callback(fn(&mut T) -> (), fn(&mut T) -> ()),
+    Action(Box<dyn crate::handlers::Action>)
 }
 
 #[repr(u8)]
@@ -36,7 +37,7 @@ pub enum AutoOff {
 /// 96 bits / 12 bytes.
 ///
 /// Consider using a RewriteLayer instead if you don't need
-/// the string or Shift functionality.
+/// the string, Shift or Action functionality.
 ///
 /// If AutoOff is set to anything but AutoOff::No, the layer will turn itself of
 /// after any key release (AutoOff::AfterAll), after a non-modifier-non-oneshot
@@ -66,7 +67,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
             match event {
                 Event::KeyRelease(kc) => {
                     let mut rewrite_happend = false;
-                    for (from, to) in self.rewrites.iter() {
+                    for (from, to) in self.rewrites.iter_mut() {
                         if *from == kc.keycode {
                             match to {
                                 LayerAction::RewriteTo(to_keycode) => {
@@ -104,6 +105,11 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     *status = EventStatus::Handled;
                                     rewrite_happend = true;
                                     break; //only one rewrite per layer
+                                }, 
+                                LayerAction::Action(action) => {
+                                    action.on_trigger(output);
+                                    *status = EventStatus::Handled;
+                                    rewrite_happend = true;
                                 }
                             }
                         }
@@ -146,7 +152,8 @@ impl<T: USBKeyOut> ProcessKeys<T> for Layer<'_> {
                                     break; //only one rewrite per layer
                                 }
                                 LayerAction::SendString(_)
-                                | LayerAction::SendStringShifted(_, _) => {
+                                | LayerAction::SendStringShifted(_, _) 
+                                | LayerAction::Action(_) => {
                                     *status = EventStatus::Handled;
                                     break;
                                 }

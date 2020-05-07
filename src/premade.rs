@@ -13,14 +13,14 @@ pub struct ActionToggleHandler {
     pub id: HandlerID,
 }
 impl OnOff for ActionToggleHandler {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
         output.state().toggle_handler(self.id);
     }
-    fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {}
+    fn on_deactivate(&mut self, _output: &mut dyn USBKeyOut) {}
 }
 
 impl Action for ActionToggleHandler {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
         output.state().toggle_handler(self.id);
     }
 }
@@ -95,10 +95,10 @@ impl ActionHandler {
     }
 }
 impl OnOff for ActionHandler {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
         output.state().enable_handler(self.id);
     }
-    fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_deactivate(&mut self, output: &mut dyn USBKeyOut) {
         output.state().disable_handler(self.id);
     }
 }
@@ -254,7 +254,7 @@ impl<T: USBKeyOut> ProcessKeys<T> for CopyPaste {
 /// by handler_overwrite
 pub struct ActionNone;
 impl Action for ActionNone{
-    fn on_trigger(&mut self, _output: &mut impl USBKeyOut) {}
+    fn on_trigger(&mut self, _output: &mut dyn USBKeyOut) {}
 }
 
 pub struct ActionAbort {
@@ -270,7 +270,7 @@ impl ActionAbort {
         self.handler_overwrite.push((handler_id, enabled));
     }
 
-    fn do_abort(&mut self, output: &mut impl USBKeyOut) {
+    fn do_abort(&mut self, output: &mut dyn USBKeyOut) {
         let state = output.state();
         for (handler_id, enabled) in self.handler_overwrite.iter() {
             state.set_handler(*handler_id, *enabled);
@@ -285,14 +285,14 @@ impl ActionAbort {
 }
 
 impl Action for ActionAbort {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {self.do_abort(output);}
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {self.do_abort(output);}
     }
 
 impl OnOff for ActionAbort {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
         self.do_abort(output);
     }
-    fn on_deactivate(&mut self, _output: &mut impl USBKeyOut) {}
+    fn on_deactivate(&mut self, _output: &mut dyn USBKeyOut) {}
 
 }
 

@@ -55,13 +55,13 @@ pub enum HandlerResult {
 /// Notably implemented on &str, so you can just pass in a &str
 /// to be send to the host computer.
 
-pub trait Action {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut);
+pub trait Action: Send+ Sync {
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut);
 }
 
 /// send a string as an Action
 impl Action for &str {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
         output.send_string(self);
     }
 }
@@ -70,14 +70,14 @@ impl Action for &str {
 ///
 /// that means the current modifiers are sent as well by USBKeyboard
 impl Action for KeyCode {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
         output.register_key(*self);
     }
 }
 
 ///Register multiple key codes as OnOff action
 impl Action for Vec<KeyCode> {
-    fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+    fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
         output.send_keys(self);
         output.send_empty();
     }
@@ -90,8 +90,8 @@ impl Action for Vec<KeyCode> {
 /// Used by PressReleaseMacros, StickyMacros, OneShots
 /// see PressReleaseMacro, StickyMacro
 pub trait OnOff {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut);
-    fn on_deactivate(&mut self, output: &mut impl USBKeyOut);
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut);
+    fn on_deactivate(&mut self, output: &mut dyn USBKeyOut);
 }
 
 

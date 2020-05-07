@@ -84,12 +84,12 @@ mod tests {
         struct Short();
         struct Long();
         impl Action for Short {
-            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+            fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
                 output.send_keys(&[KeyCode::A]);
             }
         }
         impl Action for Long {
-            fn on_trigger(&mut self, output: &mut impl USBKeyOut) {
+            fn on_trigger(&mut self, output: &mut dyn USBKeyOut) {
                 output.send_keys(&[KeyCode::B]);
             }
         }

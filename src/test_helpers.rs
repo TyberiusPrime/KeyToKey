@@ -112,21 +112,21 @@ pub struct PressCounter {
     pub up_counter: u8,
 }
 impl OnOff for Arc<RwLock<PressCounter>> {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
         self.write().down_counter += 1;
         output.send_keys(&[KeyCode::H]);
     }
-    fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_deactivate(&mut self, output: &mut dyn USBKeyOut) {
         self.write().up_counter += 1;
         output.send_keys(&[KeyCode::I]);
     }
 }
 impl OnOff for PressCounter {
-    fn on_activate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
         self.down_counter += 1;
         output.send_keys(&[KeyCode::H]);
     }
-    fn on_deactivate(&mut self, output: &mut impl USBKeyOut) {
+    fn on_deactivate(&mut self, output: &mut dyn USBKeyOut) {
         self.up_counter += 1;
         output.send_keys(&[KeyCode::I]);
     }
