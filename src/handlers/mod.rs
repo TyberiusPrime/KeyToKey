@@ -14,6 +14,7 @@ mod spacecadet;
 mod tapdance;
 mod unicodekeyboard;
 mod usbkeyboard;
+pub mod debug_handlers;
 
 use crate::USBKeyOut;
 pub use autoshift::AutoShift;

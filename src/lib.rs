@@ -227,12 +227,14 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
 /// as different key combinations
 /// unfortunatly, we can't detect what we're connected to,
 /// so the keyboard needs to provide some kinde of switch key.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnicodeSendMode {
     //default X
     Linux = 1,
+    LinuxDvorak,
     /// use https://github.com/samhocevar/wincompose
     WinCompose,
+    WinComposeDvorak,
     // used by the tests
     Debug,
 }
@@ -266,6 +268,30 @@ fn hex_digit_to_keycode(digit: char) -> KeyCode {
         _ => panic!("Passed more than one digit to hex_digit_to_keycode"),
     }
 }
+fn hex_digit_to_keycode_dvorak(digit: char) -> KeyCode {
+    //todo which way it's shorter in machine code this or
+    //with the derived nums...
+    match digit {
+        '0' => KeyCode::Kp0,
+        '1' => KeyCode::Kp1,
+        '2' => KeyCode::Kp2,
+        '3' => KeyCode::Kp3,
+        '4' => KeyCode::Kp4,
+        '5' => KeyCode::Kp5,
+        '6' => KeyCode::Kp6,
+        '7' => KeyCode::Kp7,
+        '8' => KeyCode::Kp8,
+        '9' => KeyCode::Kp9,
+        'A' | 'a' => KeyCode::A,
+        'B' | 'b' => KeyCode::N,
+        'C' | 'c' => KeyCode::I,
+        'D' | 'd' => KeyCode::H,
+        'E' | 'e' => KeyCode::D,
+        'F' | 'f' => KeyCode::Y,
+        _ => panic!("Passed more than one digit to hex_digit_to_keycode"),
+    }
+}
+
 /// the handlers use this trait to generate their output
 pub trait USBKeyOut {
     /// send these USB Keycodes concurrently rigth away.
@@ -292,7 +318,17 @@ pub trait USBKeyOut {
                 }
                 self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
-            }
+            },
+            UnicodeSendMode::LinuxDvorak => {
+                self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, KeyCode::F]);
+                self.send_empty();
+                for out_c in c.escape_unicode().skip(3).take_while(|x| *x != '}') {
+                    self.send_keys(&[hex_digit_to_keycode_dvorak(out_c)]);
+                    self.send_empty();
+                }
+                self.send_keys(&[KeyCode::Enter]);
+                self.send_empty();
+            },
             UnicodeSendMode::WinCompose => {
                 self.send_keys(&[KeyCode::RAlt]);
                 self.send_keys(&[KeyCode::U]);
@@ -302,7 +338,18 @@ pub trait USBKeyOut {
                 }
                 self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
+            },
+            UnicodeSendMode::WinComposeDvorak => {
+                self.send_keys(&[KeyCode::RAlt]);
+                self.send_keys(&[KeyCode::F]);
+                let escaped = c.escape_unicode();
+                for out_c in escaped.skip(3).take_while(|x| *x != '}') {
+                    self.send_keys(&[hex_digit_to_keycode_dvorak(out_c)]);
+                }
+                self.send_keys(&[KeyCode::Enter]);
+                self.send_empty();
             }
+
             UnicodeSendMode::Debug => {
                 let escaped = c.escape_unicode();
                 for out_c in escaped.skip(3).take_while(|x| *x != '}') {
