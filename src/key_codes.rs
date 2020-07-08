@@ -392,3 +392,15 @@ impl KeyCodeInfo for u32 {
         return UserKey::UK0.to_u32() <= self && self <= UserKey::UK99.to_u32(); //RGui
     }
 }
+
+mod test {
+    #[test]
+    fn testKeyCodeInfo() {
+        use super::{KeyCodeInfo, KeyCode};
+        assert!(KeyCode::A.to_u32().is_usb_keycode());
+        assert!(KeyCode::Application.to_u32().is_usb_keycode());
+        assert!(KeyCode::Power.to_u32().is_usb_keycode());
+        assert!(!KeyCode::Power.to_u32().is_private_keycode());
+
+    }
+}

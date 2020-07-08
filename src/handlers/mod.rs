@@ -1,5 +1,5 @@
 use crate::key_codes::KeyCode;
-use crate::key_stream::{Event, EventStatus};
+use crate::{Event, EventStatus};
 use no_std_compat::prelude::v1::*;
 
 mod autoshift;
