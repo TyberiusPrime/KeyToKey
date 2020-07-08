@@ -14,25 +14,27 @@ pub enum OneShotStatus {
     TriggerUsed,
     Off,
 }
-/// A OneShot key
-/// press it, on_activate will be called,
+/// A OneShot key.
+/// Press it, on_activate will be called.
+///
 /// on_deactivate will be called after the next non-oneshot key release
 /// or if the OneShot trigger is pressed again
-/// 
-/// Also, if the OneShot trigger is pressed again on_double_tap_triggerX is called 
+///
+/// Also, if the OneShot trigger is pressed again on_double_tap_trigger1/2 is called 
 /// (after callbacks.on_deactivate, use ActionNone for no action)
 ///
 /// If held_timeout is > 0 and the key is pressed for at least that many ms,
 /// and on_deactivate will be called upon release. This typically is useful
 /// for graphics work where the user presses the modifiers while interacting
-/// with the mouse
+/// with the mouse.
 ///
 /// You may also define a released_timeout - after this time, without
-/// a different keypress, the OneShot will also deactivate
+/// a different keypress, the OneShot will also deactivate.
 ///
 /// OneShots have two triggers to accomodate the usual left/right modifier keys,
-/// just pass in Keycode::No if you want one trigger to be ignored
-/// note that the oneshots always lead to the left variant of the modifier being sent,
+/// just pass in Keycode::No if you want one trigger to be ignored.
+///
+/// Note that the oneshots always lead to the left variant of the modifier being sent,
 /// even if they're being triggered by the right one.
 pub struct OneShot<M1, M2, M3> {
     trigger1: u32,

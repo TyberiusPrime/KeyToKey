@@ -15,6 +15,10 @@ pub trait TapDanceAction {
 }
 
 
+///Depending on how often a key has ben pressed repeatedly
+///(within a timeout), do different things.
+///
+///You will need to implement a TapDanceAction
 pub struct TapDance<M>{
     trigger: u32,
     tap_count: u8,

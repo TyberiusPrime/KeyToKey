@@ -5,6 +5,14 @@ use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use no_std_compat::prelude::v1::*;
 
+/// Handler that does one thing on a short tab,
+/// and another on a long tab with a configurable threshold
+///
+/// Action happens on release
+///
+/// Note that this is a simple implementation that just considers
+/// the time from the last key-event without considering
+/// whether that was actually the press of the LongTap key
 pub struct LongTap<M1, M2> {
     trigger: u32,
     action_short: M1,
@@ -28,14 +36,6 @@ impl<M1: Action, M2: Action> LongTap<M1, M2> {
     }
 }
 
-/// Handle that does one thing on a short tab,
-/// and another on a long tab with a configurable threshold
-///
-/// Action happens on release
-///
-/// Note that this is a simple implementation that just considers
-/// the time from the last key-event withouth considering
-/// whether that was actually the press of the LongTap key
 impl<T: USBKeyOut, M1: Action, M2: Action> ProcessKeys<T> for LongTap<M1, M2> {
     fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
         for (event, status) in iter_unhandled_mut(events).rev() {

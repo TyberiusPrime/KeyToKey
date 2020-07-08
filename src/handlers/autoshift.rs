@@ -4,12 +4,17 @@ use crate::key_stream::{iter_unhandled_mut, Event, EventStatus};
 use crate::USBKeyOut;
 use core::convert::TryInto;
 use no_std_compat::prelude::v1::*;
+
+/// Shift keys if they're pressend beyond threshold_ms
+/// supposedly for RSI sufferers - this implementation has
+/// not been used in daily usage yet.
 pub struct AutoShift {
     shift_letters: bool,
     shift_numbers: bool,
     shift_special: bool,
     threshold_ms: u16,
 }
+
 impl AutoShift {
     pub fn new(threshold_ms: u16) -> AutoShift {
         AutoShift {
