@@ -306,6 +306,7 @@ pub trait USBKeyOut {
     fn state(&mut self) -> &mut KeyboardState;
     fn ro_state(&self) -> &KeyboardState;
     fn debug(&mut self, s: &str);
+    fn bootloader(&mut self); // start the boot loader 
 
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {

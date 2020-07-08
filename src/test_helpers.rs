@@ -42,6 +42,8 @@ impl USBKeyOut for KeyOutCatcher {
         println!("{}", s);
     }
 
+    fn bootloader(&mut self) {}
+
     fn send_keys(&mut self, keys: &[KeyCode]) {
         self.reports.push(keys.iter().map(|&x| x.to_u8()).collect());
     }

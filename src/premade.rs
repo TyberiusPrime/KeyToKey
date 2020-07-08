@@ -102,6 +102,34 @@ impl OnOff for ActionHandler {
         output.state().disable_handler(self.id);
     }
 }
+
+/// Disable/enable handler (layer) on activation/deactivation
+/// for use with PressRelease, StickyKeys, OneShot, SpaceCadet
+///
+/// Can also be used with Modifier::* (pass in mod as HandelerID)
+/// Acts as the inverse of ActionHandler - this one enables when the button is released!
+pub struct InverseActionHandler {
+    id: HandlerID,
+}
+impl InverseActionHandler {
+    pub fn new(id: HandlerID) -> InverseActionHandler {
+        InverseActionHandler{id}
+    }
+}
+impl OnOff for InverseActionHandler {
+    fn on_activate(&mut self, output: &mut dyn USBKeyOut) {
+        output.debug("off");
+        output.state().disable_handler(self.id);
+    }
+    fn on_deactivate(&mut self, output: &mut dyn USBKeyOut) {
+        output.debug("on");
+        output.state().enable_handler(self.id);
+    }
+}
+
+
+
+
 /// make the shift keys behave as a OneShot
 /// 
 /// hint: use before space cadet
