@@ -323,6 +323,10 @@ pub trait USBKeyOut {
             UnicodeSendMode::LinuxDvorak => {
                 self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, KeyCode::F]);
                 self.send_empty();
+                for _ in 0..10 { //must be alternating
+                    self.send_keys(&[KeyCode::LCtrl]);
+                    self.send_empty();
+                }
                 for out_c in c.escape_unicode().skip(3).take_while(|x| *x != '}') {
                     self.send_keys(&[hex_digit_to_keycode_dvorak(out_c)]);
                     self.send_empty();
