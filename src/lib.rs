@@ -11,7 +11,7 @@ pub mod test_helpers;
 extern crate alloc;
 extern crate no_std_compat;
 extern crate spin;
-pub use crate::handlers::{ProcessKeys, HandlerResult};
+pub use crate::handlers::{HandlerResult, ProcessKeys};
 
 pub use crate::key_codes::{AcceptsKeycode, KeyCode, UserKey};
 use crate::key_stream::Key;
@@ -31,7 +31,7 @@ pub enum Modifier {
     Alt = 2,
     Gui = 3,
 }
- 
+
 const KEYBOARD_STATE_RESERVED_BITS: usize = 5;
 const ABORT_BIT: usize = 4;
 
@@ -69,7 +69,6 @@ impl KeyboardState {
         self.modifiers_and_enabled_handlers.set(no, enabled);
     }
 
-
     pub fn toggle_handler(&mut self, no: HandlerID) {
         self.modifiers_and_enabled_handlers
             .set(no, !self.modifiers_and_enabled_handlers[no]);
@@ -79,8 +78,8 @@ impl KeyboardState {
         self.modifiers_and_enabled_handlers[no]
     }
 
-    ///tell the Keyboard to 
-    /// * reset handlers to their default state, clear 
+    ///tell the Keyboard to
+    /// * reset handlers to their default state, clear
     /// * clear all remaining events - unhandled or not
     /// * reset all modifiers to default
     pub fn abort_and_clear_events(&mut self) {
@@ -151,11 +150,14 @@ impl<'a, T: USBKeyOut> Keyboard<'a, T> {
         }
         //skip the modifiers
         for (ii, h) in self.handlers.iter_mut().enumerate() {
-            if self.output.state().modifiers_and_enabled_handlers[ii + KEYBOARD_STATE_RESERVED_BITS] {
+            if self.output.state().modifiers_and_enabled_handlers[ii + KEYBOARD_STATE_RESERVED_BITS]
+            {
                 match h.process_keys(&mut self.events, &mut self.output) {
-                    HandlerResult::NoOp => {},
+                    HandlerResult::NoOp => {}
                     HandlerResult::Disable => {
-                        self.output.state().disable_handler((ii + KEYBOARD_STATE_RESERVED_BITS) as HandlerID);
+                        self.output
+                            .state()
+                            .disable_handler((ii + KEYBOARD_STATE_RESERVED_BITS) as HandlerID);
                     }
                 }
                 if self.output.state()._aborted() {
@@ -249,16 +251,16 @@ fn hex_digit_to_keycode(digit: char) -> KeyCode {
     //todo which way it's shorter in machine code this or
     //with the derived nums...
     match digit {
-        '0' => KeyCode::Kp0,
-        '1' => KeyCode::Kp1,
-        '2' => KeyCode::Kp2,
-        '3' => KeyCode::Kp3,
-        '4' => KeyCode::Kp4,
-        '5' => KeyCode::Kp5,
-        '6' => KeyCode::Kp6,
-        '7' => KeyCode::Kp7,
-        '8' => KeyCode::Kp8,
-        '9' => KeyCode::Kp9,
+        '0' => KeyCode::Kb0,
+        '1' => KeyCode::Kb1,
+        '2' => KeyCode::Kb2,
+        '3' => KeyCode::Kb3,
+        '4' => KeyCode::Kb4,
+        '5' => KeyCode::Kb5,
+        '6' => KeyCode::Kb6,
+        '7' => KeyCode::Kb7,
+        '8' => KeyCode::Kb8,
+        '9' => KeyCode::Kb9,
         'A' | 'a' => KeyCode::A,
         'B' | 'b' => KeyCode::B,
         'C' | 'c' => KeyCode::C,
@@ -272,16 +274,16 @@ fn hex_digit_to_keycode_dvorak(digit: char) -> KeyCode {
     //todo which way it's shorter in machine code this or
     //with the derived nums...
     match digit {
-        '0' => KeyCode::Kp0,
-        '1' => KeyCode::Kp1,
-        '2' => KeyCode::Kp2,
-        '3' => KeyCode::Kp3,
-        '4' => KeyCode::Kp4,
-        '5' => KeyCode::Kp5,
-        '6' => KeyCode::Kp6,
-        '7' => KeyCode::Kp7,
-        '8' => KeyCode::Kp8,
-        '9' => KeyCode::Kp9,
+        '0' => KeyCode::Kb0,
+        '1' => KeyCode::Kb1,
+        '2' => KeyCode::Kb2,
+        '3' => KeyCode::Kb3,
+        '4' => KeyCode::Kb4,
+        '5' => KeyCode::Kb5,
+        '6' => KeyCode::Kb6,
+        '7' => KeyCode::Kb7,
+        '8' => KeyCode::Kb8,
+        '9' => KeyCode::Kb9,
         'A' | 'a' => KeyCode::A,
         'B' | 'b' => KeyCode::N,
         'C' | 'c' => KeyCode::I,
@@ -306,7 +308,7 @@ pub trait USBKeyOut {
     fn state(&mut self) -> &mut KeyboardState;
     fn ro_state(&self) -> &KeyboardState;
     fn debug(&mut self, s: &str);
-    fn bootloader(&mut self); // start the boot loader 
+    fn bootloader(&mut self); // start the boot loader
 
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {
@@ -319,21 +321,27 @@ pub trait USBKeyOut {
                 }
                 self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
-            },
+            }
             UnicodeSendMode::LinuxDvorak => {
                 self.send_keys(&[KeyCode::LCtrl, KeyCode::LShift, KeyCode::F]);
                 self.send_empty();
-                for _ in 0..10 { //must be alternating
+                for _ in 0..10 {
+                    //must be alternating
                     self.send_keys(&[KeyCode::LCtrl]);
                     self.send_empty();
                 }
                 for out_c in c.escape_unicode().skip(3).take_while(|x| *x != '}') {
                     self.send_keys(&[hex_digit_to_keycode_dvorak(out_c)]);
                     self.send_empty();
+                    /* for _ in 0..10 {
+                        //must be alternating
+                        self.send_keys(&[KeyCode::LCtrl]);
+                        self.send_empty();
+                    } */
                 }
                 self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
-            },
+            }
             UnicodeSendMode::WinCompose => {
                 self.send_keys(&[KeyCode::RAlt]);
                 self.send_keys(&[KeyCode::U]);
@@ -343,7 +351,7 @@ pub trait USBKeyOut {
                 }
                 self.send_keys(&[KeyCode::Enter]);
                 self.send_empty();
-            },
+            }
             UnicodeSendMode::WinComposeDvorak => {
                 self.send_keys(&[KeyCode::RAlt]);
                 self.send_keys(&[KeyCode::F]);
