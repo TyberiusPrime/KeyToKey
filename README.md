@@ -53,6 +53,7 @@ Advanced Features working
   * Leader sequences (e.g. hit ```leader h e a r t``` to enter a heart emoji, or an arbitrary string)
   * TapDance (count the number of taps on a key, pass the final count to a callback)
   * AutoShift - Short tap: lower case, longer tap: uppercase. Removes key repeat though.
+  * send keys later (e.g. for a macro that sends a key after a delay)
 
 
 K2K strives to seperate the triggers (when does something happen) from the actual actions.

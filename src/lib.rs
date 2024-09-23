@@ -309,6 +309,10 @@ pub trait USBKeyOut {
     fn ro_state(&self) -> &KeyboardState;
     fn debug(&mut self, s: &str);
     fn bootloader(&mut self); // start the boot loader
+    //
+    // register to send later.
+    fn send_keys_later(&mut self, keys: &[KeyCode], ms: u16);
+    fn do_send_later(&mut self);
 
     fn send_unicode(&mut self, c: char) {
         match self.state().unicode_mode {

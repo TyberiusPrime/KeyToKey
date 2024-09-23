@@ -1,4 +1,4 @@
-use crate::handlers::{OnOff, ProcessKeys, HandlerResult};
+use crate::handlers::{HandlerResult, OnOff, ProcessKeys};
 #[allow(unused_imports)]
 use crate::key_codes::{AcceptsKeycode, KeyCode};
 #[allow(unused_imports)]
@@ -12,6 +12,7 @@ pub struct KeyOutCatcher {
     keys_registered: Vec<u8>,
     pub reports: Vec<Vec<u8>>,
     state: KeyboardState,
+    later: Vec<(u32, Vec<KeyCode>)>,
 }
 impl KeyOutCatcher {
     pub fn new() -> KeyOutCatcher {
@@ -19,6 +20,7 @@ impl KeyOutCatcher {
             keys_registered: Vec::new(),
             reports: Vec::new(),
             state: KeyboardState::new(),
+            later: Vec::new(),
         }
     }
     // for testing, clear the catcher of everything
@@ -56,6 +58,10 @@ impl USBKeyOut for KeyOutCatcher {
         self.reports.push(self.keys_registered.clone());
         self.keys_registered.clear();
     }
+
+    fn send_keys_later(&mut self, _keys: &[KeyCode], _ms: u16) {}
+    fn do_send_later(&mut self) {}
+
     fn send_empty(&mut self) {
         self.reports.push(Vec::new());
     }
@@ -97,7 +103,11 @@ impl TimeoutLogger {
     }
 }
 impl<T: USBKeyOut> ProcessKeys<T> for TimeoutLogger {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, output: &mut T) -> HandlerResult {
+    fn process_keys(
+        &mut self,
+        events: &mut Vec<(Event, EventStatus)>,
+        output: &mut T,
+    ) -> HandlerResult {
         for (event, _status) in iter_unhandled_mut(events) {
             if let Event::TimeOut(ms_since_last) = event {
                 if *ms_since_last > self.min_timeout_ms {
@@ -145,7 +155,11 @@ impl Debugger {
 }
 #[cfg(test)]
 impl<T: USBKeyOut> ProcessKeys<T> for Debugger {
-    fn process_keys(&mut self, events: &mut Vec<(Event, EventStatus)>, _output: &mut T) -> HandlerResult {
+    fn process_keys(
+        &mut self,
+        events: &mut Vec<(Event, EventStatus)>,
+        _output: &mut T,
+    ) -> HandlerResult {
         println!("{}, {:?}", self.s, events);
         HandlerResult::NoOp
     }
@@ -159,7 +173,7 @@ pub trait Checks {
     fn rc(&mut self, key: impl AcceptsKeycode, should: &[&[KeyCode]]);
     /// timeout and check
     fn tc(&mut self, ms_since_last: u16, should: &[&[KeyCode]]);
-    /// 
+    ///
     /// press check with defined ms_since
     fn pct(&mut self, key: impl AcceptsKeycode, ms_since_last: u16, should: &[&[KeyCode]]);
     /// release check with defined ms_since
